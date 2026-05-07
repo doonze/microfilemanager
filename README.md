@@ -14,7 +14,7 @@ These are the improvements MFM adds on top of the upstream TFM codebase:
 
 | Enhancement | Description |
 |---|---|
-| **External config system** | All settings configurable via `config.php` — no editing the main file. Survives version upgrades. |
+| **External config system** | All settings configurable via `config.php` — no need to touch the main file. You can still keep configs in the main file just like TFM if you prefer.<br>➕ `config.php` survives version upgrades — drop in a new `microfilemanager.php` and your settings are untouched.<br>➖ Requires copying both files when deploying — `microfilemanager.php` + `config.php`. |
 | **Smart config merging** | `$auth_users`, `$readonly_users`, and `$directories_users` are merged from `config.php`, not replaced. Main file wins on conflict. |
 | **Server local timezone** | File timestamps display in the server's local timezone. Removed TFM's hardcoded UTC override. |
 | **Conflict resolution** | Upload, copy, and move operations now show an **Overwrite / Rename / Cancel** dialog on name collision. TFM previously failed silently or threw an error with no recovery options. |
