@@ -17,7 +17,8 @@ These are the improvements MFM adds on top of the upstream TFM codebase:
 | **External config system** | All settings configurable via `config.php` — no editing the main file. Survives version upgrades. |
 | **Smart config merging** | `$auth_users`, `$readonly_users`, and `$directories_users` are merged from `config.php`, not replaced. Main file wins on conflict. |
 | **Server local timezone** | File timestamps display in the server's local timezone. Removed TFM's hardcoded UTC override. |
-| **Upload conflict queue** | Multi-file uploads with name collisions are handled one at a time. Fixes TFM bug where simultaneous conflict modals would stomp each other, locking the UI. |
+| **Conflict resolution** | Upload, copy, and move operations now show an **Overwrite / Rename / Cancel** dialog on name collision. TFM previously failed silently or threw an error with no recovery options. |
+| **Upload conflict queue** | When uploading multiple files with simultaneous name collisions, conflicts are queued and resolved one at a time. Fixes TFM bug where concurrent conflict dialogs would stomp each other, locking the UI and requiring a page refresh. |
 | **ACE editor config** | Editor theme and font size configurable via `config.php` (`$ace_theme`, `$ace_font_size`). |
 | **Dark-mode viewer** | Highlight.js syntax theme auto-switches with the UI theme. Configurable separately for light and dark via `config.php`. |
 | **Write-permission awareness** | File editor detects read-only files. Save button grays out and errors surface cleanly instead of silently failing. |
