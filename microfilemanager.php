@@ -1718,6 +1718,7 @@ if (isset($_GET['upload']) && !FM_READONLY) {
         }
 
         Dropzone.options.fileUploader = {
+            dictDefaultMessage: "Drop files here or click to choose",
             chunking: true,
             chunkSize: <?php echo UPLOAD_CHUNK_SIZE; ?>,
             forceChunking: true,
