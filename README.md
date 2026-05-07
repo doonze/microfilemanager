@@ -19,9 +19,10 @@ These are the improvements MFM adds on top of the upstream TFM codebase:
 | **Server local timezone** | File timestamps display in the server's local timezone. Removed TFM's hardcoded UTC override. |
 | **Conflict resolution** | Upload, copy, and move operations now show an **Overwrite / Rename / Cancel** dialog on name collision. TFM previously failed silently or threw an error with no recovery options. |
 | **Upload conflict queue** | When uploading multiple files with simultaneous name collisions, conflicts are queued and resolved one at a time. Fixes TFM bug where concurrent conflict dialogs would stomp each other, locking the UI and requiring a page refresh. |
-| **ACE editor config** | Editor theme and font size configurable via `config.php` (`$ace_theme`, `$ace_font_size`). |
+| **ACE editor config** | Editor theme and font size configurable via `config.php` (`$ace_theme`, `$ace_font_size`). Fixes a TFM scope bug where these settings were silently ignored inside `fm_show_footer()` — exposed as PHP constants so they're accessible globally. |
 | **Dark-mode viewer** | Highlight.js syntax theme auto-switches with the UI theme. Configurable separately for light and dark via `config.php`. |
-| **Write-permission awareness** | File editor detects read-only files. Save button grays out and errors surface cleanly instead of silently failing. |
+| **Write-permission awareness** | TFM used `@fwrite` — errors were silently swallowed with zero feedback. MFM removes the suppressor and properly checks `is_writable()`, `fopen()`, and `fwrite()` at each step. Read-only files show a **Read Only** badge; the Save button is disabled; Ctrl+S is unbound. Save errors surface as specific messages (e.g., *"File is not writable. Check permissions/ownership."*) rather than TFM's generic "try again". HTTP 403 is returned server-side before any write is attempted. |
+| **Permission denied on move** | When a move operation fails, MFM checks whether the source directory, destination directory, or destination file is the culprit and appends **(Permission denied)** to the error. TFM returned a generic move-failed message with no indication of why. |
 | **Full config coverage** | Every configurable setting in the main file is documented and overridable in `config.php`. See `config.example.php`. |
 
 ## Demo
