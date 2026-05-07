@@ -2174,6 +2174,11 @@ if (isset($_GET['view'])) {
                         class="edit-file"><i class="fa fa-pencil-square"></i> <?php echo lng('AdvancedEditor') ?>
                     </a>
                 <?php } ?>
+                <?php if (!FM_READONLY): ?>
+                    <a class="fw-bold btn btn-outline-primary" href="?p=<?php echo urlencode(FM_PATH) ?>&amp;copy=<?php echo urlencode(trim(FM_PATH . '/' . $file, '/')) ?>">
+                        <i class="fa fa-files-o"></i> <?php echo lng('Copy') ?> / <?php echo lng('Move') ?>
+                    </a>
+                <?php endif; ?>
                 <a class="fw-bold btn btn-outline-primary" href="?p=<?php echo urlencode(FM_PATH) ?>"><i class="fa fa-chevron-circle-left go-back"></i> <?php echo lng('Back') ?></a>
             </div>
             <div class="row mt-3">
