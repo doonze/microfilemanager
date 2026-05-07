@@ -1,19 +1,25 @@
 <?php
 //Default Configuration
-$CONFIG = '{"lang":"en","error_reporting":false,"show_hidden":false,"hide_Cols":false,"theme":"light"}';
+$CONFIG = '{"lang":"en","error_reporting":true,"show_hidden":false,"hide_Cols":false,"theme":"dark"}';
 
 /**
+ * MFM ~ Micro File Manager V3.0
+ * @author Doonze
+ * @github https://github.com/doonze/microfilemanager.git
+ *
+ * Forked from Tiny File Manager — https://github.com/prasathmani/tinyfilemanager
+ *
  * H3K ~ Tiny File Manager V2.6
  * @author CCP Programmers
  * @github https://github.com/prasathmani/tinyfilemanager
  * @link https://tinyfilemanager.github.io
  */
 
-//TFM version
-define('VERSION', '2.6');
+//MFM version
+define('VERSION', '3.0');
 
 //Application Title
-define('APP_TITLE', 'Tiny File Manager');
+define('APP_TITLE', 'Micro File Manager');
 
 // --- EDIT BELOW CONFIGURATION CAREFULLY ---
 
@@ -25,42 +31,56 @@ $use_auth = true;
 // Login user name and password
 // Users: array('Username' => 'Password', 'Username2' => 'Password2', ...)
 // Generate secure password hash - https://tinyfilemanager.github.io/docs/pwd.html
+// Users, readonly list, and per-user paths are managed in config.php.
+// Define them here only as fallback empty arrays — config.php values are merged
+// in below, with any entries defined HERE winning on conflict.
+// Generate password hash: php -r "echo password_hash('yourpassword', PASSWORD_DEFAULT);"
 $auth_users = array(
-    'admin' => '$2y$10$/K.hjNr84lLNDt8fTXjoI.DBp6PpeyoJ.mGwrrLuCZfAwfSAGqhOW', //admin@123
-    'user' => '$2y$10$Fg6Dz8oH9fPoZ2jJan5tZuv6Z4Kp7avtQ9bDfrdRntXtPeiMAZyGO' //12345
+    // 'admin'    => '$2y$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    // 'readonly' => '$2y$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
 );
 
-// Readonly users
-// e.g. array('users', 'guest', ...)
+// Readonly users — can browse and view but not upload, edit, or delete
+// e.g. array('readonly', 'guest', ...)
 $readonly_users = array(
-    'user'
+    // 'readonly',
+    // 'guest',
 );
 
 // Global readonly, including when auth is not being used
 $global_readonly = false;
 
-// user specific directories
+// Per-user root directories — each user lands in their own directory on login
+// Paths relative to $root_path unless absolute
 // array('Username' => 'Directory path', 'Username2' => 'Directory path', ...)
-$directories_users = array();
+$directories_users = array(
+    // 'admin'    => '/var/www',
+    // 'readonly' => '/var/www/public',
+);
 
 // Enable highlight.js (https://highlightjs.org/) on view's page
 $use_highlightjs = true;
 
-// highlight.js style
-// for dark theme use 'ir-black'
+// highlight.js style for light theme (used when FM_THEME is 'light')
+// See: https://highlightjs.org/examples for all available styles
 $highlightjs_style = 'vs';
+
+// highlight.js style for dark theme (used when FM_THEME is 'dark')
+// Good options: 'atom-one-dark', 'monokai-sublime', 'github-dark', 'ir-black'
+$highlightjs_style_dark = 'atom-one-dark';
 
 // Enable ace.js (https://ace.c9.io/) on view's page
 $edit_files = true;
 
 // Default timezone for date() and time()
 // Doc - http://php.net/manual/en/timezones.php
-$default_timezone = 'Etc/UTC'; // UTC
+$default_timezone = ''; // Empty = use server's system timezone (set in php.ini / OS).
+                         // Set explicitly e.g. 'America/Chicago' to override.
 
 // Root path for file manager
 // use absolute path of directory i.e: '/var/www/folder' or $_SERVER['DOCUMENT_ROOT'].'/folder'
 //make sure update $root_url in next section
-$root_path = $_SERVER['DOCUMENT_ROOT'];
+$root_path = '/var/www';
 
 // Root url for links in file manager.Relative to $http_host. Variants: '', 'path/to/subfolder'
 // Will not working if $root_path will be outside of server document root
@@ -98,7 +118,12 @@ $favicon_path = '';
 
 // Files and folders to excluded from listing
 // e.g. array('myfile.html', 'personal-folder', '*.php', '/path/to/folder', ...)
-$exclude_items = array();
+$exclude_items = array(
+    '.config',
+    '.cache',
+    '.DS-Store',
+    '.*'
+    );
 
 // Online office Docs Viewer
 // Available rules are 'google', 'microsoft' or false
@@ -142,11 +167,33 @@ $ip_blacklist = array(
     '::'            // non-routable meta ipv6
 );
 
+// ACE Editor default theme
+// Leave empty to use ACE's built-in default. Set to any ACE theme name to override,
+// e.g. 'chaos', 'dracula', 'monokai', 'github', 'tomorrow_night'
+// Full list: https://github.com/ajaxorg/ace/tree/master/src/theme
+$ace_theme = '';
+
+// ACE Editor default font size (points)
+// Valid values: 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 24, 32
+$ace_font_size = 12;
+
 // if User has the external config file, try to use it to override the default config above [config.php]
-// sample config - https://tinyfilemanager.github.io/config-sample.txt
+// see config.example.php for all available options
 $config_file = __DIR__ . '/config.php';
 if (is_readable($config_file)) {
+    // Snapshot user/path arrays before include so main-file entries always win
+    // on conflicts. config.php can add new entries; it cannot replace existing ones.
+    $_base_auth_users        = $auth_users;
+    $_base_readonly_users    = $readonly_users;
+    $_base_directories_users = $directories_users;
     @include($config_file);
+    // Associative arrays: + operator means left-side (base/main file) wins
+    // on duplicate keys; right-side (config.php) fills in any new entries.
+    $auth_users        = $_base_auth_users        + $auth_users;
+    $directories_users = $_base_directories_users + $directories_users;
+    // Indexed array: merge both lists then deduplicate.
+    $readonly_users = array_values(array_unique(array_merge($_base_readonly_users, $readonly_users)));
+    unset($_base_auth_users, $_base_readonly_users, $_base_directories_users);
 }
 
 // External CDN resources that can be used in the HTML (replace for GDPR compliance)
@@ -218,7 +265,11 @@ if (defined('FM_EMBED')) {
 } else {
     @set_time_limit(600);
 
-    date_default_timezone_set($default_timezone);
+    // Only override timezone if explicitly set. Empty string = use server's
+    // php.ini / OS timezone so file times display in local server time.
+    if ($default_timezone) {
+        date_default_timezone_set($default_timezone);
+    }
 
     ini_set('default_charset', 'UTF-8');
     if (version_compare(PHP_VERSION, '5.6.0', '<') && function_exists('mb_internal_encoding')) {
@@ -357,7 +408,7 @@ if ($use_auth) {
                                 <form class="form-signin" action="" method="post" autocomplete="off">
                                     <div class="mb-3">
                                         <div class="brand">
-                                            <svg version="1.0" xmlns="http://www.w3.org/2000/svg" M1008 width="100%" height="80px" viewBox="0 0 238.000000 140.000000" aria-label="H3K Tiny File Manager">
+                                            <svg version="1.0" xmlns="http://www.w3.org/2000/svg" M1008 width="100%" height="80px" viewBox="0 0 238.000000 140.000000" aria-label="MFM Micro File Manager">
                                                 <g transform="translate(0.000000,140.000000) scale(0.100000,-0.100000)" fill="#000000" stroke="none">
                                                     <path d="M160 700 l0 -600 110 0 110 0 0 260 0 260 70 0 70 0 0 -260 0 -260 110 0 110 0 0 600 0 600 -110 0 -110 0 0 -260 0 -260 -70 0 -70 0 0 260 0 260 -110 0 -110 0 0 -600z" />
                                                     <path fill="#003500" d="M1008 1227 l-108 -72 0 -117 0 -118 110 0 110 0 0 110 0 110 70 0 70 0 0 -180 0 -180 -125 0 c-69 0 -125 -3 -125 -6 0 -3 23 -39 52 -80 l52 -74 73 0 73 0 0 -185 0 -185 -70 0 -70 0 0 115 0 115 -110 0 -110 0 0 -190 0 -190 181 0 181 0 109 73 108 72 1 181 0 181 -69 48 -68 49 68 50 69 49 0 249 0 248 -182 -1 -183 0 -107 -72z" />
@@ -394,7 +445,7 @@ if ($use_auth) {
                         </div>
                         <div class="footer text-center">
                             &mdash;&mdash; &copy;
-                            <a href="https://tinyfilemanager.github.io/" target="_blank" class="text-decoration-none text-muted" data-version="<?php echo VERSION; ?>">CCP Programmers</a> &mdash;&mdash;
+                            <a href="https://github.com/doonze/microfilemanager" target="_blank" class="text-decoration-none text-muted" data-version="<?php echo VERSION; ?>">Doonze</a> &mdash;&mdash;
                         </div>
                     </div>
                 </div>
@@ -452,6 +503,9 @@ define('FM_EDIT_FILE', $edit_files);
 defined('FM_ICONV_INPUT_ENC') || define('FM_ICONV_INPUT_ENC', $iconv_input_encoding);
 defined('FM_USE_HIGHLIGHTJS') || define('FM_USE_HIGHLIGHTJS', $use_highlightjs);
 defined('FM_HIGHLIGHTJS_STYLE') || define('FM_HIGHLIGHTJS_STYLE', $highlightjs_style);
+defined('FM_HIGHLIGHTJS_STYLE_DARK') || define('FM_HIGHLIGHTJS_STYLE_DARK', $highlightjs_style_dark);
+defined('FM_ACE_THEME') || define('FM_ACE_THEME', $ace_theme);
+defined('FM_ACE_FONT_SIZE') || define('FM_ACE_FONT_SIZE', $ace_font_size);
 defined('FM_DATETIME_FORMAT') || define('FM_DATETIME_FORMAT', $datetime_format);
 
 unset($p, $use_auth, $iconv_input_encoding, $use_highlightjs, $highlightjs_style);
@@ -499,13 +553,23 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
         header('X-XSS-Protection:0');
         $file_path = $path . '/' . $file;
 
+        // Check write permission before touching the file
+        if (!is_writable($file_path)) {
+            header("HTTP/1.1 403 Forbidden");
+            die(json_encode(['error' => 'File is not writable. Check permissions/ownership.']));
+        }
+
         $writedata = $_POST['content'];
         $fd = fopen($file_path, "w");
-        $write_results = @fwrite($fd, $writedata);
+        if ($fd === false) {
+            header("HTTP/1.1 500 Internal Server Error");
+            die(json_encode(['error' => 'Could not open file for writing.']));
+        }
+        $write_results = fwrite($fd, $writedata);
         fclose($fd);
         if ($write_results === false) {
             header("HTTP/1.1 500 Internal Server Error");
-            die("Could Not Write File! - Check Permissions / Ownership");
+            die(json_encode(['error' => 'File write failed. Check permissions/ownership.']));
         }
         die(true);
     }
@@ -755,20 +819,56 @@ if (isset($_GET['copy'], $_GET['finish']) && !FM_READONLY) {
     // move?
     $move = isset($_GET['move']);
     $move = fm_clean_path(urldecode($move));
+    // overwrite existing destination?
+    $overwrite = isset($_GET['overwrite']);
     // copy/move/duplicate
     if ($from != $dest) {
         $msg_from = trim(FM_PATH . '/' . basename($from), '/');
-        if ($move) { // Move and to != from so just perform move
-            $rename = fm_rename($from, $dest);
+        if (file_exists($dest) && !$overwrite) {
+            // Destination exists — show conflict alert with an Overwrite button
+            $overwrite_url = FM_SELF_URL . '?p=' . urlencode(FM_PATH)
+                . '&copy=' . urlencode($copy)
+                . '&finish=1' . ($move ? '&move=1' : '') . '&overwrite=1';
+            $cancel_url = FM_SELF_URL . '?p=' . urlencode(FM_PATH);
+            $conflict_label = is_dir($from) ? lng('Folder') : lng('File');
+            fm_set_msg(
+                $conflict_label . ' <b>' . fm_enc(basename($from)) . '</b> ' . lng('already exists') . '. '
+                . '<a href="' . htmlspecialchars($overwrite_url) . '" class="btn btn-sm btn-danger ms-2">'
+                . lng('Overwrite') . '</a> '
+                . '<a href="' . htmlspecialchars($cancel_url) . '" class="btn btn-sm btn-secondary ms-1">'
+                . lng('Cancel') . '</a>',
+                'alert'
+            );
+        } elseif ($move) { // Move (dest clear, or overwrite confirmed)
+            if ($overwrite && file_exists($dest)) {
+                // Dirs must be cleared first — rename() can't replace a non-empty dir.
+                // For files, rename() is atomic and replaces on its own, but clearing
+                // removes any dir/file type mismatch at the destination.
+                fm_rdelete($dest);
+            }
+            // Call rename() directly rather than fm_rename() so we bypass its
+            // file_exists($dest) guard — that guard is what re-triggers the alert.
+            if (!is_dir($from) && !fm_is_valid_ext($dest)) {
+                $rename = false; // extension blocked
+            } elseif (!file_exists($from)) {
+                $rename = null; // source vanished
+            } else {
+                $rename = rename($from, $dest);
+            }
             if ($rename) {
                 fm_set_msg(sprintf(lng('Moved from') . ' <b>%s</b> ' . lng('to') . ' <b>%s</b>', fm_enc($copy), fm_enc($msg_from)));
             } elseif ($rename === null) {
                 fm_set_msg(lng('File or folder with this path already exists'), 'alert');
             } else {
-                fm_set_msg(sprintf(lng('Error while moving from') . ' <b>%s</b> ' . lng('to') . ' <b>%s</b>', fm_enc($copy), fm_enc($msg_from)), 'error');
+                // Distinguish permission failures from other move errors
+                $perm_issue = !is_writable(dirname($from))          // can't remove source
+                           || !is_writable(dirname($dest))           // can't write into dest dir
+                           || (file_exists($dest) && !is_writable($dest)); // can't overwrite dest
+                $move_err = sprintf(lng('Error while moving from') . ' <b>%s</b> ' . lng('to') . ' <b>%s</b>', fm_enc($copy), fm_enc($msg_from));
+                fm_set_msg($move_err . ($perm_issue ? ' (' . lng('Permission denied') . ')' : ''), 'error');
             }
-        } else { // Not move and to != from so copy with original name
-            if (fm_rcopy($from, $dest)) {
+        } else { // Copy (dest clear, or overwrite confirmed — $upd=false forces copy ignoring timestamps)
+            if (fm_rcopy($from, $dest, !$overwrite)) {
                 fm_set_msg(sprintf(lng('Copied from') . ' <b>%s</b> ' . lng('to') . ' <b>%s</b>', fm_enc($copy), fm_enc($msg_from)));
             } else {
                 fm_set_msg(sprintf(lng('Error while copying from') . ' <b>%s</b> ' . lng('to') . ' <b>%s</b>', fm_enc($copy), fm_enc($msg_from)), 'error');
@@ -946,6 +1046,73 @@ if (isset($_GET['dl'], $_POST['token'])) {
     }
 }
 
+// Upload conflict resolution
+if (isset($_POST['upload_resolve']) && !FM_READONLY) {
+    if (!verifyToken($_POST['token'])) {
+        echo json_encode(['status' => 'error', 'info' => 'Invalid Token.']);
+        exit;
+    }
+
+    $action        = isset($_POST['action'])   ? $_POST['action']                              : '';
+    $p             = fm_clean_path(isset($_POST['p'])        ? $_POST['p']        : '');
+    $fullPathInput = fm_clean_path(isset($_POST['fullpath']) ? $_POST['fullpath'] : '');
+
+    $path = FM_ROOT_PATH;
+    if ($p != '') {
+        $path .= '/' . $p;
+    }
+    $fullPath = $path . '/' . $fullPathInput;
+    $partFile = $fullPath . '.part';
+
+    // Security: resolved path must stay inside FM_ROOT_PATH
+    $realRoot = realpath(FM_ROOT_PATH);
+    $realPart = realpath(dirname($partFile));
+    if ($realPart === false || strpos($realPart, $realRoot) !== 0) {
+        echo json_encode(['status' => 'error', 'info' => 'Invalid path.']);
+        exit;
+    }
+
+    if (!file_exists($partFile)) {
+        echo json_encode(['status' => 'error', 'info' => 'Upload temp file not found — did it expire?']);
+        exit;
+    }
+
+    if ($action === 'overwrite') {
+        @unlink($fullPath);
+        if (rename($partFile, $fullPath)) {
+            echo json_encode(['status' => 'success', 'info' => 'File overwritten successfully.']);
+        } else {
+            echo json_encode(['status' => 'error', 'info' => 'Failed to overwrite file.']);
+        }
+    } elseif ($action === 'rename') {
+        $newName = isset($_POST['new_name']) ? basename(fm_clean_path($_POST['new_name'])) : '';
+        if (!$newName || !fm_isvalid_filename($newName)) {
+            echo json_encode(['status' => 'error', 'info' => 'Invalid filename.']);
+            exit;
+        }
+        if (!fm_is_valid_ext($newName)) {
+            echo json_encode(['status' => 'error', 'info' => 'File extension not allowed.']);
+            exit;
+        }
+        $newFullPath = $path . '/' . $newName;
+        if (file_exists($newFullPath)) {
+            echo json_encode(['status' => 'error', 'info' => 'A file with that name already exists.']);
+            exit;
+        }
+        if (rename($partFile, $newFullPath)) {
+            echo json_encode(['status' => 'success', 'info' => 'Saved as ' . fm_enc($newName) . '.']);
+        } else {
+            echo json_encode(['status' => 'error', 'info' => 'Failed to save file.']);
+        }
+    } elseif ($action === 'cancel') {
+        @unlink($partFile);
+        echo json_encode(['status' => 'success', 'info' => 'Upload cancelled.']);
+    } else {
+        echo json_encode(['status' => 'error', 'info' => 'Unknown action.']);
+    }
+    exit;
+}
+
 // Upload
 if (!empty($_FILES) && !FM_READONLY) {
     if (isset($_POST['token'])) {
@@ -1052,12 +1219,18 @@ if (!empty($_FILES) && !FM_READONLY) {
 
                 if ($chunkIndex == $chunkTotal - 1) {
                     if (file_exists($fullPath)) {
-                        $ext_1 = $ext ? '.' . $ext : '';
-                        $fullPathTarget = $path . '/' . basename($fullPathInput, $ext_1) . '_' . date('ymdHis') . $ext_1;
+                        // Don't silently rename — tell the client there's a conflict.
+                        // The .part file stays on disk; upload_resolve handles final placement.
+                        $response = array(
+                            'status'   => 'conflict',
+                            'info'     => 'File already exists.',
+                            'filename' => basename($fullPath),
+                            'fullpath' => $fullPathInput,
+                        );
                     } else {
-                        $fullPathTarget = $fullPath;
+                        rename("{$fullPath}.part", $fullPath);
+                        $response = array('status' => 'success', 'info' => 'file upload successful');
                     }
-                    rename("{$fullPath}.part", $fullPathTarget);
                 }
             } else if (move_uploaded_file($tmp_name, $fullPath)) {
                 // Be sure that the file has been uploaded
@@ -1432,7 +1605,127 @@ if (isset($_GET['upload']) && !FM_READONLY) {
         </div>
     </div>
     <?php print_external('js-dropzone'); ?>
+
+    <!-- Upload conflict resolution modal -->
+    <div class="modal fade" id="uploadConflictModal" tabindex="-1" aria-labelledby="uploadConflictLabel" aria-hidden="true" data-bs-theme="<?php echo FM_THEME; ?>">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="uploadConflictLabel">
+                        <i class="fa fa-exclamation-triangle text-warning"></i> File Already Exists
+                        <span id="conflict-queue-badge" class="badge bg-secondary ms-2" style="display:none;font-size:0.7em;"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong id="conflict-filename"></strong> already exists in this folder. What would you like to do?</p>
+                    <div class="mb-3" id="conflict-rename-wrapper" style="display:none;">
+                        <label for="conflict-new-name" class="form-label">New filename:</label>
+                        <input type="text" class="form-control" id="conflict-new-name">
+                        <div class="form-text text-danger" id="conflict-rename-error" style="display:none;"></div>
+                    </div>
+                </div>
+                <div class="modal-footer d-flex justify-content-between">
+                    <button type="button" class="btn btn-secondary" id="conflict-cancel-btn">Cancel Upload</button>
+                    <div>
+                        <button type="button" class="btn btn-warning me-2" id="conflict-rename-btn">Save as New Name</button>
+                        <button type="button" class="btn btn-danger" id="conflict-overwrite-btn">Overwrite</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <script>
+        // ── Conflict queue ────────────────────────────────────────────────────
+        // When multiple files are uploaded at once and more than one has a
+        // name collision, conflicts are pushed here and shown one at a time.
+        // resolveConflict() pops the next item after each resolution.
+        var conflictQueue = [];
+        var conflictBusy  = false;
+
+        function queueConflict(conflictFile, conflictPath) {
+            conflictQueue.push({ file: conflictFile, path: conflictPath });
+            processConflictQueue();
+        }
+
+        function processConflictQueue() {
+            if (conflictBusy || conflictQueue.length === 0) return;
+            conflictBusy = true;
+
+            var next         = conflictQueue.shift();
+            var conflictFile = next.file;
+            var conflictPath = next.path;
+
+            var modalEl      = document.getElementById('uploadConflictModal');
+            var modal        = bootstrap.Modal.getOrCreateInstance(modalEl);
+            var renameWrapper = document.getElementById('conflict-rename-wrapper');
+            var renameInput   = document.getElementById('conflict-new-name');
+            var renameError   = document.getElementById('conflict-rename-error');
+            var queueBadge    = document.getElementById('conflict-queue-badge');
+            var renameBtn     = document.getElementById('conflict-rename-btn');
+
+            // Populate modal for this conflict
+            document.getElementById('conflict-filename').textContent = conflictFile;
+            renameInput.value            = conflictFile;
+            renameWrapper.style.display  = 'none';
+            renameError.style.display    = 'none';
+            renameBtn.textContent        = 'Save as New Name';
+
+            // Show queue depth badge so user knows more are waiting
+            if (conflictQueue.length > 0) {
+                queueBadge.textContent     = conflictQueue.length + ' more waiting';
+                queueBadge.style.display   = 'inline';
+            } else {
+                queueBadge.style.display   = 'none';
+            }
+
+            // Wire buttons — clone to drop any previous onclick handlers
+            function replaceBtn(id) {
+                var old = document.getElementById(id);
+                var clone = old.cloneNode(true);
+                old.parentNode.replaceChild(clone, old);
+                return clone;
+            }
+            var overwriteBtn = replaceBtn('conflict-overwrite-btn');
+            var cancelBtn    = replaceBtn('conflict-cancel-btn');
+            renameBtn        = replaceBtn('conflict-rename-btn');
+            // Re-fetch renameBtn after clone (ID is the same, DOM updated)
+            var freshRenameBtn = document.getElementById('conflict-rename-btn');
+
+            freshRenameBtn.onclick = function() {
+                var rw = document.getElementById('conflict-rename-wrapper');
+                var ri = document.getElementById('conflict-new-name');
+                var re = document.getElementById('conflict-rename-error');
+                if (rw.style.display === 'none') {
+                    rw.style.display = 'block';
+                    ri.focus();
+                    ri.select();
+                    this.textContent = 'Confirm New Name';
+                } else {
+                    resolveConflict('rename', conflictPath, ri.value.trim(), modal, re);
+                }
+            };
+
+            overwriteBtn.onclick = function() {
+                resolveConflict('overwrite', conflictPath, '', modal,
+                    document.getElementById('conflict-rename-error'));
+            };
+
+            cancelBtn.onclick = function() {
+                resolveConflict('cancel', conflictPath, '', modal,
+                    document.getElementById('conflict-rename-error'));
+            };
+
+            // If user dismisses via X or backdrop, treat as cancel and unblock queue
+            modalEl.addEventListener('hidden.bs.modal', function onHidden() {
+                modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                conflictBusy = false;
+                processConflictQueue();
+            }, { once: true });
+
+            modal.show();
+        }
+
         Dropzone.options.fileUploader = {
             chunking: true,
             chunkSize: <?php echo UPLOAD_CHUNK_SIZE; ?>,
@@ -1451,12 +1744,15 @@ if (isset($_GET['upload']) && !FM_READONLY) {
                     xhr.ontimeout = (function() {
                         toast('Error: Server Timeout');
                     });
-                }).on("success", function(res) {
+                }).on("success", function(file, response) {
                     try {
-                        let _response = JSON.parse(res.xhr.response);
+                        let _response = (typeof response === 'string') ? JSON.parse(response) : response;
 
-                        if (_response.status == "error") {
+                        if (_response.status === "error") {
                             toast(_response.info);
+                        } else if (_response.status === "conflict") {
+                            // Queue the conflict — modal shown one at a time
+                            queueConflict(_response.filename, _response.fullpath);
                         }
                     } catch (e) {
                         toast("Error: Invalid JSON response");
@@ -1465,6 +1761,36 @@ if (isset($_GET['upload']) && !FM_READONLY) {
                     toast(response);
                 });
             }
+        };
+
+        function resolveConflict(action, fullpath, newName, modal, renameError) {
+            renameError.style.display = 'none';
+            var formData = new FormData();
+            formData.append('upload_resolve', '1');
+            formData.append('action',   action);
+            formData.append('p',        '<?php echo fm_enc(FM_PATH) ?>');
+            formData.append('fullpath', fullpath);
+            formData.append('new_name', newName);
+            formData.append('token',    '<?php echo $_SESSION['token'] ?>');
+
+            fetch('<?php echo htmlspecialchars(FM_SELF_URL) ?>?p=<?php echo fm_enc(FM_PATH) ?>', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    modal.hide();
+                    // hidden.bs.modal listener fires next, sets conflictBusy=false
+                    // and calls processConflictQueue() for the next item
+                    toast(data.info);
+                } else {
+                    // Inline error — user must correct before queue can advance
+                    renameError.textContent   = data.info;
+                    renameError.style.display = 'block';
+                }
+            })
+            .catch(() => toast('Network error during conflict resolution.'));
         }
     </script>
 <?php
@@ -1676,7 +2002,7 @@ if (isset($_GET['help'])) {
                 <div class="row">
                     <div class="col-xs-12 col-sm-6">
                         <p>
-                        <h3><a href="https://github.com/prasathmani/tinyfilemanager" target="_blank" class="app-v-title"> Tiny File Manager <?php echo VERSION; ?></a></h3>
+                        <h3><a href="https://github.com/doonze/microfilemanager" target="_blank" class="app-v-title"> Micro File Manager <?php echo VERSION; ?></a></h3>
                         </p>
                         <p>Author: PRAŚATH MANİ</p>
                         <p>Mail Us: <a href="mailto:ccpprogrammers@gmail.com">ccpprogrammers [at] gmail [dot] com</a> </p>
@@ -1733,6 +2059,7 @@ if (isset($_GET['view'])) {
 
     $file_url = FM_ROOT_URL . fm_convert_win((FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $file);
     $file_path = $path . '/' . $file;
+    $file_writable = is_writable($file_path); // used by buttons, keyboard shortcuts, and save handler
 
     $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
     $mime_type = fm_get_mime_type($file_path);
@@ -1940,6 +2267,7 @@ if (isset($_GET['edit']) && !FM_READONLY) {
 
     $file_url = FM_ROOT_URL . fm_convert_win((FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $file);
     $file_path = $path . '/' . $file;
+    $file_writable = is_writable($file_path); // used by buttons, keyboard shortcuts, and save handler
 
     // normal editer
     $isNormalEditor = true;
@@ -1952,10 +2280,22 @@ if (isset($_GET['edit']) && !FM_READONLY) {
     // Save File
     if (isset($_POST['savedata'])) {
         $writedata = $_POST['savedata'];
-        $fd = fopen($file_path, "w");
-        @fwrite($fd, $writedata);
-        fclose($fd);
-        fm_set_msg(lng('File Saved Successfully'));
+        if (!is_writable($file_path)) {
+            fm_set_msg(lng('File is not writable. Check permissions.'), 'error');
+        } else {
+            $fd = fopen($file_path, "w");
+            if ($fd === false) {
+                fm_set_msg(lng('Could not open file for writing.'), 'error');
+            } else {
+                $write_result = fwrite($fd, $writedata);
+                fclose($fd);
+                if ($write_result === false) {
+                    fm_set_msg(lng('File could not be saved. Check permissions.'), 'error');
+                } else {
+                    fm_set_msg(lng('File Saved Successfully'));
+                }
+            }
+        }
     }
 
     $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
@@ -1999,13 +2339,16 @@ if (isset($_GET['edit']) && !FM_READONLY) {
                     <a title=" <?php echo lng('Back') ?>" class="btn btn-sm btn-outline-primary" href="?p=<?php echo urlencode(trim(FM_PATH)) ?>&amp;view=<?php echo urlencode($file) ?>"><i class="fa fa-reply-all"></i> <?php echo lng('Back') ?></a>
                     <a title="<?php echo lng('BackUp') ?>" class="btn btn-sm btn-outline-primary" href="javascript:void(0);" onclick="backup('<?php echo urlencode(trim(FM_PATH)) ?>','<?php echo urlencode($file) ?>')"><i class="fa fa-database"></i> <?php echo lng('BackUp') ?></a>
                     <?php if ($is_text) { ?>
+                        <?php if (!$file_writable): ?>
+                            <span class="btn btn-sm btn-outline-warning disabled"><i class="fa fa-lock"></i> Read Only</span>
+                        <?php endif; ?>
                         <?php if ($isNormalEditor) { ?>
                             <a title="Advanced" class="btn btn-sm btn-outline-primary" href="?p=<?php echo urlencode(trim(FM_PATH)) ?>&amp;edit=<?php echo urlencode($file) ?>&amp;env=ace"><i class="fa fa-pencil-square-o"></i> <?php echo lng('AdvancedEditor') ?></a>
-                            <button type="button" class="btn btn-sm btn-success" name="Save" data-url="<?php echo fm_enc($file_url) ?>" onclick="edit_save(this,'nrl')"><i class="fa fa-floppy-o"></i> Save
+                            <button type="button" class="btn btn-sm <?php echo $file_writable ? 'btn-success' : 'btn-secondary'; ?>" name="Save" data-url="<?php echo fm_enc($file_url) ?>" onclick="edit_save(this,'nrl')" <?php echo $file_writable ? '' : 'disabled title="File is read-only"'; ?>><i class="fa fa-floppy-o"></i> Save
                             </button>
                         <?php } else { ?>
                             <a title="Plain Editor" class="btn btn-sm btn-outline-primary" href="?p=<?php echo urlencode(trim(FM_PATH)) ?>&amp;edit=<?php echo urlencode($file) ?>"><i class="fa fa-text-height"></i> <?php echo lng('NormalEditor') ?></a>
-                            <button type="button" class="btn btn-sm btn-success" name="Save" data-url="<?php echo fm_enc($file_url) ?>" onclick="edit_save(this,'ace')"><i class="fa fa-floppy-o"></i> <?php echo lng('Save') ?>
+                            <button type="button" class="btn btn-sm <?php echo $file_writable ? 'btn-success' : 'btn-secondary'; ?>" name="Save" data-url="<?php echo fm_enc($file_url) ?>" onclick="edit_save(this,'ace')" <?php echo $file_writable ? '' : 'disabled title="File is read-only"'; ?>><i class="fa fa-floppy-o"></i> <?php echo lng('Save') ?>
                             </button>
                         <?php } ?>
                     <?php } ?>
@@ -2015,11 +2358,13 @@ if (isset($_GET['edit']) && !FM_READONLY) {
         <?php
         if ($is_text && $isNormalEditor) {
             echo '<textarea class="mt-2" id="normal-editor" rows="33" cols="120" style="width: 99.5%;">' . htmlspecialchars($content) . '</textarea>';
-            echo '<script>document.addEventListener("keydown", function(e) {if ((window.navigator.platform.match("Mac") ? e.metaKey : e.ctrlKey)  && e.keyCode == 83) { e.preventDefault();edit_save(this,"nrl");}}, false);</script>';
+            if ($file_writable) {
+                echo '<script>document.addEventListener("keydown", function(e) {if ((window.navigator.platform.match("Mac") ? e.metaKey : e.ctrlKey)  && e.keyCode == 83) { e.preventDefault();edit_save(this,"nrl");}}, false);</script>';
+            }
         } elseif ($is_text) {
             echo '<div id="editor" contenteditable="true">' . htmlspecialchars($content) . '</div>';
         } else {
-            fm_set_msg(lng('FILE EXTENSION IS NOT SUPPORTED'), 'error');
+            fm_set_msg(lng('FILE EXTENSION HAS NOT SUPPORTED'), 'error');
         }
         ?>
     </div>
@@ -2343,9 +2688,9 @@ $all_files_size = 0;
                     <a href="javascript:document.getElementById('a-copy').click();" class="btn btn-small btn-outline-primary btn-2"><i class="fa fa-files-o"></i> <?php echo lng('Copy') ?> </a>
                 </div>
             </div>
-            <div class="col-3 d-none d-sm-block"><a href="https://tinyfilemanager.github.io" target="_blank" class="float-right text-muted">Tiny File Manager <?php echo VERSION; ?></a></div>
+            <div class="col-3 d-none d-sm-block"><a href="https://github.com/doonze/microfilemanager" target="_blank" class="float-right text-muted">Micro File Manager <?php echo VERSION; ?></a></div>
         <?php else: ?>
-            <div class="col-12"><a href="https://tinyfilemanager.github.io" target="_blank" class="float-right text-muted">Tiny File Manager <?php echo VERSION; ?></a></div>
+            <div class="col-12"><a href="https://github.com/doonze/microfilemanager" target="_blank" class="float-right text-muted">Micro File Manager <?php echo VERSION; ?></a></div>
         <?php endif; ?>
     </div>
 </form>
@@ -3674,7 +4019,7 @@ class FM_Config
         if (strlen($CONFIG)) {
             $data = fm_object_to_array(json_decode($CONFIG));
         } else {
-            $msg = 'Tiny File Manager<br>Error: Cannot load configuration';
+            $msg = 'Micro File Manager<br>Error: Cannot load configuration';
             if (substr($fm_url, -1) == '/') {
                 $fm_url = rtrim($fm_url, '/');
                 $msg .= '<br>';
@@ -3827,8 +4172,8 @@ function fm_show_header_login()
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-        <meta name="description" content="Web based File Manager in PHP, Manage your files efficiently and easily with Tiny File Manager">
-        <meta name="author" content="CCP Programmers">
+        <meta name="description" content="Web based File Manager in PHP, Manage your files efficiently and easily with Micro File Manager">
+        <meta name="author" content="Doonze">
         <meta name="robots" content="noindex, nofollow">
         <meta name="googlebot" content="noindex">
         <?php if ($favicon_path) {
@@ -3990,20 +4335,23 @@ function fm_show_header_login()
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-        <meta name="description" content="Web based File Manager in PHP, Manage your files efficiently and easily with Tiny File Manager">
-        <meta name="author" content="CCP Programmers">
+        <meta name="description" content="Web based File Manager in PHP, Manage your files efficiently and easily with Micro File Manager">
+        <meta name="author" content="Doonze">
         <meta name="robots" content="noindex, nofollow">
         <meta name="googlebot" content="noindex">
         <?php if ($favicon_path) {
             echo '<link rel="icon" href="' . fm_enc($favicon_path) . '" type="image/png">';
         } ?>
-        <title><?php echo fm_enc(APP_TITLE) ?> | <?php echo (isset($_GET['view']) ? $_GET['view'] : ((isset($_GET['edit'])) ? $_GET['edit'] : "H3K")); ?></title>
+        <title><?php echo fm_enc(APP_TITLE) ?> | <?php echo (isset($_GET['view']) ? $_GET['view'] : ((isset($_GET['edit'])) ? $_GET['edit'] : "MFM")); ?></title>
         <?php print_external('pre-jsdelivr'); ?>
         <?php print_external('pre-cloudflare'); ?>
         <?php print_external('css-bootstrap'); ?>
         <?php print_external('css-font-awesome'); ?>
         <?php if (FM_USE_HIGHLIGHTJS && isset($_GET['view'])): ?>
-            <?php print_external('css-highlightjs'); ?>
+            <?php
+                $hljs_theme = (FM_THEME === 'dark') ? FM_HIGHLIGHTJS_STYLE_DARK : FM_HIGHLIGHTJS_STYLE;
+                echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/' . htmlspecialchars($hljs_theme) . '.min.css">';
+            ?>
         <?php endif; ?>
         <script type="text/javascript">
             window.csrf = '<?php echo $_SESSION['token']; ?>';
@@ -4922,11 +5270,15 @@ function fm_show_header_login()
                                     return
                                 }
                             },
-                            failure: function(mes) {
-                                toast("Error: try again");
-                            },
                             error: function(mes) {
-                                toast(`<p style="background-color:red">${mes.responseText}</p>`);
+                                var msg = "Save failed";
+                                try {
+                                    var json = JSON.parse(mes.responseText);
+                                    if (json.error) msg = json.error;
+                                } catch(e) {
+                                    if (mes.responseText) msg = mes.responseText;
+                                }
+                                toast('<span style="color:#ff6b6b"><i class="fa fa-exclamation-triangle"></i> ' + msg + '</span>');
                             }
                         });
                     } else {
@@ -5168,6 +5520,10 @@ function fm_show_header_login()
         <?php if (isset($_GET['edit']) && isset($_GET['env']) && FM_EDIT_FILE && !FM_READONLY):
             $ext = pathinfo($_GET["edit"], PATHINFO_EXTENSION);
             $ext =  $ext == "js" ? "javascript" :  $ext;
+            // Recompute write access here — fm_show_footer() has its own PHP scope
+            $_ace_file = str_replace('/', '', fm_clean_path($_GET['edit'], false));
+            $_ace_path = FM_ROOT_PATH . (FM_PATH != '' ? '/' . FM_PATH : '');
+            $_ace_file_writable = is_writable($_ace_path . '/' . $_ace_file);
         ?>
             <?php print_external('js-ace'); ?>
             <script>
@@ -5176,11 +5532,12 @@ function fm_show_header_login()
                     path: "ace/mode/<?php echo $ext; ?>",
                     inline: true
                 });
-                //editor.setTheme("ace/theme/twilight"); // Dark Theme
+                <?php if (FM_ACE_THEME !== ''): ?>editor.setTheme("ace/theme/<?php echo htmlspecialchars(FM_ACE_THEME); ?>");<?php endif; ?>
                 editor.setShowPrintMargin(false); // Hide the vertical ruler
                 function ace_commend(cmd) {
                     editor.commands.exec(cmd, editor);
                 }
+                <?php if ($_ace_file_writable): ?>
                 editor.commands.addCommands([{
                     name: 'save',
                     bindKey: {
@@ -5191,6 +5548,7 @@ function fm_show_header_login()
                         edit_save(this, 'ace');
                     }
                 }]);
+                <?php endif; ?>
 
                 function renderThemeMode() {
                     var $modeEl = $("select#js-ace-mode"),
@@ -5436,7 +5794,7 @@ function fm_show_header_login()
                     $themeEl.val(editor.getTheme());
                     $(function() {
                         //set default font size in drop down
-                        $fontSizeEl.val(12).change();
+                        $fontSizeEl.val(<?php echo (int)FM_ACE_FONT_SIZE; ?>).change();
                     });
                 }
 
@@ -5491,7 +5849,7 @@ function fm_show_header_login()
         global $lang;
 
         // English Language
-        $tr['en']['AppName']        = 'Tiny File Manager';
+        $tr['en']['AppName']        = 'Micro File Manager';
         $tr['en']['AppTitle']       = 'File Manager';
         $tr['en']['Login']          = 'Sign in';
         $tr['en']['Username']       = 'Username';
@@ -5571,6 +5929,8 @@ function fm_show_header_login()
         $tr['en']['Source path not defined']    = 'Source path not defined';
         $tr['en']['already exists']     = 'already exists';
         $tr['en']['Error while moving from']    = 'Error while moving from';
+        $tr['en']['Permission denied']          = 'Permission denied';
+        $tr['en']['Overwrite']                  = 'Overwrite';
         $tr['en']['Create archive?']    = 'Create archive?';
         $tr['en']['Invalid file or folder name']    = 'Invalid file or folder name';
         $tr['en']['Archive unpacked']   = 'Archive unpacked';
@@ -5586,7 +5946,7 @@ function fm_show_header_login()
         $tr['en']['Advanced Search']    = 'Advanced Search';
         $tr['en']['Error while copying from']    = 'Error while copying from';
         $tr['en']['Invalid characters in file name']                = 'Invalid characters in file name';
-        $tr['en']['FILE EXTENSION IS NOT SUPPORTED']                = 'FILE EXTENSION IS NOT SUPPORTED';
+        $tr['en']['FILE EXTENSION HAS NOT SUPPORTED']               = 'FILE EXTENSION HAS NOT SUPPORTED';
         $tr['en']['Selected files and folder deleted']              = 'Selected files and folder deleted';
         $tr['en']['Error while fetching archive info']              = 'Error while fetching archive info';
         $tr['en']['Delete selected files and folders?']             = 'Delete selected files and folders?';

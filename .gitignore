@@ -1,0 +1,15 @@
+# MicroFileManager — .gitignore
+
+# Live config — contains real user credentials and paths. NEVER commit this.
+config.php
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor metadata
+.vscode/
+.idea/
+*.swp
+*.swo
