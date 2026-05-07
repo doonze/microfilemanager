@@ -96,31 +96,6 @@ To enable/disable authentication set `$use_auth` to true or false.
 - :wrench: **External Config:** All settings manageable via `config.php` without touching the main file.
 - :bangbang: **And Much More!**
 
-## [Deploy by Docker](https://github.com/doonze/microfilemanager/wiki/Deploy-by-Docker)
-
-Build and run with Docker Compose:
-
-```bash
-docker compose up -d
-```
-
-Or run directly:
-
-```bash
-docker build . -t doonze/microfilemanager:master
-docker run -d -v /absolute/path:/var/www/html/data -p 80:80 --restart=always --name microfilemanager doonze/microfilemanager:master
-```
-
-Mount your `config.php` into the container to persist settings:
-
-```yaml
-volumes:
-  - ./config.php:/var/www/html/config.php
-```
-
-Set your server timezone via the `TZ` environment variable in `docker-compose.yml`,
-or leave it as UTC and control it via `$default_timezone` in `config.php`.
-
 ## License, Credit
 
 - Available under the [GNU license](https://github.com/doonze/microfilemanager/blob/master/LICENSE)
