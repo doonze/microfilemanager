@@ -1,8 +1,8 @@
 services:
-  tinyfilemanager:
+  microfilemanager:
     build: .                                            # Uncomment if you want to build locally instead of pulling
-#    image: tinyfilemanager/tinyfilemanager:latest      ###  If you want to run a Docker container on an image from Docker Hub, comment on the upper line 'build: .'
-    container_name: tinyfilemanager
+#    image: doonze/microfilemanager:latest              ###  If you want to run a Docker container on an image from Docker Hub, comment on the upper line 'build: .'
+    container_name: microfilemanager
     restart: unless-stopped
     ports:
       - "8080:80"                               
@@ -11,7 +11,7 @@ services:
       - ./config.php:/var/www/html/config.php           ### Uncomment if you are using config.php
    
     environment:
-      TZ: UTC
+      TZ: UTC                                          ### Set your timezone here, or leave as UTC and use $default_timezone in config.php instead
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/"]

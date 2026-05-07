@@ -1,11 +1,11 @@
 # how to build?
 # docker login
 ## .....input your docker id and password
-#docker build . -t tinyfilemanager/tinyfilemanager:master
-#docker push tinyfilemanager/tinyfilemanager:master
+#docker build . -t doonze/microfilemanager:master
+#docker push doonze/microfilemanager:master
 
 # how to use?
-# docker run -d -v /absolute/path:/var/www/html/data -p 80:80 --restart=always --name tinyfilemanager tinyfilemanager/tinyfilemanager:master
+# docker run -d -v /absolute/path:/var/www/html/data -p 80:80 --restart=always --name microfilemanager doonze/microfilemanager:master
 
 FROM php:7.4-cli-alpine
 
@@ -21,6 +21,6 @@ RUN docker-php-ext-install \
 
 WORKDIR /var/www/html
 
-COPY tinyfilemanager.php index.php
+COPY microfilemanager.php index.php
 
 CMD ["sh", "-c", "php -S 0.0.0.0:80"]
