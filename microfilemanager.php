@@ -407,7 +407,7 @@ if ($use_auth) {
                             <div class="card-body">
                                 <form class="form-signin" action="" method="post" autocomplete="off">
                                     <div class="mb-3">
-                                        <div class="brand text-center" style="font-family: Impact, 'Arial Narrow', Arial, sans-serif; font-size: 4.5rem; letter-spacing: 0.12em; line-height: 1; padding: 0.1rem 0 0.3rem;">MFM</div>
+                                        <div class="brand text-center" style="font-family: Impact, 'Arial Narrow', Arial, sans-serif; font-size: 3rem; letter-spacing: 0.15em; line-height: 1; padding: 0.1rem 0 0.3rem; white-space: nowrap;">MFM</div>
                                         <div class="text-center">
                                             <h1 class="card-title"><?php echo APP_TITLE; ?></h1>
                                         </div>
