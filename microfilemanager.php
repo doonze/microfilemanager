@@ -1857,10 +1857,23 @@ if (isset($_GET['copy']) && !isset($_GET['finish']) && !FM_READONLY) {
             <strong>Source path:</strong> <?php echo fm_enc(fm_convert_win(FM_ROOT_PATH . '/' . $copy)) ?><br>
             <strong>Destination folder:</strong> <?php echo fm_enc(fm_convert_win(FM_ROOT_PATH . '/' . FM_PATH)) ?>
         </p>
+        <?php
+            $source_dir = trim(dirname($copy), '/');
+            $dest_dir   = trim(FM_PATH, '/');
+            $is_same_dir = ($source_dir === $dest_dir);
+        ?>
+        <?php if ($is_same_dir): ?>
+            <p class="text-muted"><i class="fa fa-arrow-down"></i> <em>Select a destination folder below to enable Copy / Move</em></p>
+        <?php endif; ?>
         <p>
-            <b><a href="?p=<?php echo urlencode(FM_PATH) ?>&amp;copy=<?php echo urlencode($copy) ?>&amp;finish=1"><i class="fa fa-check-circle"></i> Copy</a></b> &nbsp;
-            <b><a href="?p=<?php echo urlencode(FM_PATH) ?>&amp;copy=<?php echo urlencode($copy) ?>&amp;finish=1&amp;move=1"><i class="fa fa-check-circle"></i> Move</a></b> &nbsp;
-            <b><a href="?p=<?php echo urlencode(FM_PATH) ?>" class="text-danger"><i class="fa fa-times-circle"></i> Cancel</a></b>
+            <?php if ($is_same_dir): ?>
+                <span class="btn btn-sm btn-secondary disabled opacity-50 me-1" title="Select a destination folder first"><i class="fa fa-files-o"></i> <?php echo lng('Copy') ?></span>
+                <span class="btn btn-sm btn-secondary disabled opacity-50 me-1" title="Select a destination folder first"><i class="fa fa-folder-o"></i> <?php echo lng('Move') ?></span>
+            <?php else: ?>
+                <a href="?p=<?php echo urlencode(FM_PATH) ?>&amp;copy=<?php echo urlencode($copy) ?>&amp;finish=1" class="btn btn-sm btn-success me-1"><i class="fa fa-files-o"></i> <?php echo lng('Copy') ?></a>
+                <a href="?p=<?php echo urlencode(FM_PATH) ?>&amp;copy=<?php echo urlencode($copy) ?>&amp;finish=1&amp;move=1" class="btn btn-sm btn-warning me-1"><i class="fa fa-folder-o"></i> <?php echo lng('Move') ?></a>
+            <?php endif; ?>
+            <a href="?p=<?php echo urlencode(FM_PATH) ?>" class="btn btn-sm btn-outline-danger"><i class="fa fa-times-circle"></i> <?php echo lng('Cancel') ?></a>
         </p>
         <p><i><?php echo lng('Select folder') ?></i></p>
         <ul class="folders break-word">
