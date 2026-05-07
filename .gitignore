@@ -3,6 +3,9 @@
 # Live config — contains real user credentials and paths. NEVER commit this.
 config.php
 
+# Local project context — contains personal paths and deployment notes.
+PROJECT_CONTEXT.md
+
 # OS noise
 .DS_Store
 Thumbs.db
