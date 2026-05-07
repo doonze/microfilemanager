@@ -407,13 +407,8 @@ if ($use_auth) {
                             <div class="card-body">
                                 <form class="form-signin" action="" method="post" autocomplete="off">
                                     <div class="mb-3">
-                                        <div class="brand">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="80px" viewBox="0 0 238 80" aria-label="MFM Micro File Manager">
-                                                <text x="119" y="70" text-anchor="middle" font-family="Impact, 'Arial Narrow', Arial, sans-serif" font-size="80" fill="currentColor" letter-spacing="6">MFM</text>
-                                            </svg>
-                                        </div>
                                         <div class="text-center">
-                                            <h1 class="card-title"><?php echo APP_TITLE; ?></h1>
+                                            <h1 class="card-title fw-bold"><?php echo APP_TITLE; ?></h1>
                                         </div>
                                     </div>
                                     <hr />
