@@ -44,14 +44,21 @@ You can rename the file to anything you want (`files.php`, `index.php`, etc.).
 
 ### Configuration
 
-MFM uses an external `config.php` for all settings. Copy `config.example.php` to `config.php`
-in the same directory as `microfilemanager.php` and edit it to set your users and preferences.
+**Option 1 — Edit the main file directly (simplest)**
+
+Open `microfilemanager.php` and set your users and preferences at the top of the file, just like TFM. One file, done.
+
+**Option 2 — Use an external `config.php` (optional, upgrade-safe)**
+
+Copy `config.example.php` to `config.php` in the same directory. Settings there are merged in at runtime and survive upgrades — when a new version of MFM drops, just replace `microfilemanager.php` and your config is untouched.
+
+This also lets you keep a base set of defaults in the main file and layer server-specific settings on top via `config.php`. Useful if you copy MFM to multiple servers — each gets its own users and paths in a local `config.php` without needing separate copies of the main file.
 
 ```bash
 cp config.example.php config.php
 ```
 
-Set your users in `config.php`:
+Whichever approach you use, set your users like this:
 
 ```php
 $auth_users = array(
@@ -68,7 +75,7 @@ php -r "echo password_hash('yourpassword', PASSWORD_DEFAULT);"
 
 Or use the online tool: [https://tinyfilemanager.github.io/docs/pwd.html](https://tinyfilemanager.github.io/docs/pwd.html)
 
-To enable/disable authentication set `$use_auth` to true or false in `config.php`.
+To enable/disable authentication set `$use_auth` to true or false.
 
 ### :loudspeaker: Features
 
