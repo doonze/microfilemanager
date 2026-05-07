@@ -1,0 +1,11 @@
+# Live config — contains real credentials. NEVER bake into an image.
+config.php
+
+# Project/dev files — not needed in the image
+PROJECT_CONTEXT.md
+CHECKPOINT_MANIFEST.md
+README.md
+.git
+.gitignore
+docker-compose.yml
+screenshot.gif
