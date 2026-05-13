@@ -50,8 +50,6 @@ Initial MFM release — fork of TinyFileManager V2.6.
   with a queue depth badge; no more concurrent dialogs stomping each other.
 - **Configurable session timeout** — `$session_timeout` (default 4 hours).
   Applied via `ini_set` + `session_set_cookie_params` before `session_start`.
-- **Session expiry → login redirect** — expired sessions on AJAX return `401` JSON;
-  JS reloads to login. Editor save no longer falsely reports success.
 - **Server local timezone** — timestamps display in server timezone; removed TFM's
   hardcoded UTC override. Configurable via `$default_timezone`.
 - **ACE editor config** — `$ace_theme` and `$ace_font_size` configurable via
@@ -73,3 +71,4 @@ Initial MFM release — fork of TinyFileManager V2.6.
 - Login screen — H3K SVG logo replaced with bold `APP_TITLE` text.
 - Upload dropzone message — updated to "Drop files here or click to choose"
   (original only mentioned dropping, no hint it was clickable).
+ble).
