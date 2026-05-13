@@ -1112,6 +1112,26 @@ if (isset($_POST['upload_resolve']) && !FM_READONLY) {
         } else {
             echo json_encode(['status' => 'error', 'info' => 'Failed to save file.']);
         }
+    } elseif ($action === 'autonumber') {
+        // Auto-generate a unique name: originalname (1).ext, (2).ext ...
+        $info     = pathinfo($fullPathInput);
+        $base     = $info['filename'];
+        $ext      = isset($info['extension']) && $info['extension'] !== '' ? '.' . $info['extension'] : '';
+        $i        = 1;
+        $autoName = '';
+        do {
+            $autoName = $base . ' (' . $i . ')' . $ext;
+            $i++;
+        } while (file_exists($path . '/' . $autoName) && $i < 1000);
+        if ($i >= 1000) {
+            echo json_encode(['status' => 'error', 'info' => 'Could not generate a unique filename.']);
+            exit;
+        }
+        if (rename($partFile, $path . '/' . $autoName)) {
+            echo json_encode(['status' => 'success', 'info' => 'Saved as ' . htmlspecialchars($autoName) . '.']);
+        } else {
+            echo json_encode(['status' => 'error', 'info' => 'Failed to save file.']);
+        }
     } elseif ($action === 'cancel') {
         @unlink($partFile);
         echo json_encode(['status' => 'success', 'info' => 'Upload cancelled.']);
@@ -1586,6 +1606,14 @@ if (isset($_GET['upload']) && !FM_READONLY) {
                     <strong><?php echo lng('DestinationFolder') ?></strong>: <?php echo fm_enc(fm_convert_win(FM_PATH)) ?>
                 </p>
 
+                <div class="text-center mb-3">
+                    <button type="button" class="btn btn-primary btn-lg"
+                            onclick="Dropzone.instances[0].hiddenFileInput.click()">
+                        <i class="fa fa-folder-open-o"></i> Browse Files
+                    </button>
+                    <p class="text-muted mt-2 mb-0" style="font-size:0.85em;">or drag &amp; drop files into the area below</p>
+                </div>
+
                 <form action="<?php echo htmlspecialchars(FM_SELF_URL) . '?p=' . fm_enc(FM_PATH) ?>" class="dropzone card-tabs-container" id="fileUploader" enctype="multipart/form-data">
                     <input type="hidden" name="p" value="<?php echo fm_enc(FM_PATH) ?>">
                     <input type="hidden" name="fullpath" id="fullpath" value="<?php echo fm_enc(FM_PATH) ?>">
@@ -1627,6 +1655,14 @@ if (isset($_GET['upload']) && !FM_READONLY) {
                 </div>
                 <div class="modal-body">
                     <p><strong id="conflict-filename"></strong> already exists in this folder. What would you like to do?</p>
+                    <div id="conflict-apply-all-wrapper" class="mb-3" style="display:none;">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="conflict-apply-all">
+                            <label class="form-check-label" for="conflict-apply-all">
+                                Do this for all remaining conflicts
+                            </label>
+                        </div>
+                    </div>
                     <div class="mb-3" id="conflict-rename-wrapper" style="display:none;">
                         <label for="conflict-new-name" class="form-label">New filename:</label>
                         <input type="text" class="form-control" id="conflict-new-name">
@@ -1653,7 +1689,8 @@ if (isset($_GET['upload']) && !FM_READONLY) {
 
         function queueConflict(conflictFile, conflictPath) {
             conflictQueue.push({ file: conflictFile, path: conflictPath });
-            processConflictQueue();
+            // processConflictQueue() is triggered by Dropzone's queuecomplete event
+            // so ALL files finish uploading before any conflict modal appears
         }
 
         function processConflictQueue() {
@@ -1671,6 +1708,8 @@ if (isset($_GET['upload']) && !FM_READONLY) {
             var renameError   = document.getElementById('conflict-rename-error');
             var queueBadge    = document.getElementById('conflict-queue-badge');
             var renameBtn     = document.getElementById('conflict-rename-btn');
+            var applyAllWrapper = document.getElementById('conflict-apply-all-wrapper');
+            var applyAllCheck   = document.getElementById('conflict-apply-all');
 
             // Populate modal for this conflict
             document.getElementById('conflict-filename').textContent = conflictFile;
@@ -1678,13 +1717,16 @@ if (isset($_GET['upload']) && !FM_READONLY) {
             renameWrapper.style.display  = 'none';
             renameError.style.display    = 'none';
             renameBtn.textContent        = 'Save as New Name';
+            applyAllCheck.checked        = false;
 
-            // Show queue depth badge so user knows more are waiting
+            // Show queue depth badge + apply-all checkbox when more are waiting
             if (conflictQueue.length > 0) {
-                queueBadge.textContent     = conflictQueue.length + ' more waiting';
-                queueBadge.style.display   = 'inline';
+                queueBadge.textContent        = conflictQueue.length + ' more waiting';
+                queueBadge.style.display      = 'inline';
+                applyAllWrapper.style.display = 'block';
             } else {
-                queueBadge.style.display   = 'none';
+                queueBadge.style.display      = 'none';
+                applyAllWrapper.style.display = 'none';
             }
 
             // Wire buttons — clone to drop any previous onclick handlers
@@ -1704,24 +1746,32 @@ if (isset($_GET['upload']) && !FM_READONLY) {
                 var rw = document.getElementById('conflict-rename-wrapper');
                 var ri = document.getElementById('conflict-new-name');
                 var re = document.getElementById('conflict-rename-error');
+                var applyAll = document.getElementById('conflict-apply-all').checked;
                 if (rw.style.display === 'none') {
-                    rw.style.display = 'block';
-                    ri.focus();
-                    ri.select();
-                    this.textContent = 'Confirm New Name';
+                    if (applyAll) {
+                        // Apply-all + rename = auto-number this one and all remaining
+                        resolveConflict('autonumber', conflictPath, '', modal, re, true);
+                    } else {
+                        rw.style.display = 'block';
+                        ri.focus();
+                        ri.select();
+                        this.textContent = 'Confirm New Name';
+                    }
                 } else {
-                    resolveConflict('rename', conflictPath, ri.value.trim(), modal, re);
+                    resolveConflict('rename', conflictPath, ri.value.trim(), modal, re, applyAll);
                 }
             };
 
             overwriteBtn.onclick = function() {
+                var applyAll = document.getElementById('conflict-apply-all').checked;
                 resolveConflict('overwrite', conflictPath, '', modal,
-                    document.getElementById('conflict-rename-error'));
+                    document.getElementById('conflict-rename-error'), applyAll);
             };
 
             cancelBtn.onclick = function() {
+                var applyAll = document.getElementById('conflict-apply-all').checked;
                 resolveConflict('cancel', conflictPath, '', modal,
-                    document.getElementById('conflict-rename-error'));
+                    document.getElementById('conflict-rename-error'), applyAll);
             };
 
             // If user dismisses via X or backdrop, treat as cancel and unblock queue
@@ -1768,11 +1818,14 @@ if (isset($_GET['upload']) && !FM_READONLY) {
                     }
                 }).on("error", function(file, response) {
                     toast(response);
+                }).on("queuecomplete", function() {
+                    // All files finished uploading — now surface any conflict modals
+                    processConflictQueue();
                 });
             }
         };
 
-        function resolveConflict(action, fullpath, newName, modal, renameError) {
+        function resolveConflict(action, fullpath, newName, modal, renameError, applyAll) {
             renameError.style.display = 'none';
             var formData = new FormData();
             formData.append('upload_resolve', '1');
@@ -1789,17 +1842,52 @@ if (isset($_GET['upload']) && !FM_READONLY) {
             .then(r => r.json())
             .then(data => {
                 if (data.status === 'success') {
-                    modal.hide();
-                    // hidden.bs.modal listener fires next, sets conflictBusy=false
-                    // and calls processConflictQueue() for the next item
                     toast(data.info);
+                    if (applyAll && conflictQueue.length > 0) {
+                        // Bulk-resolve all remaining with same action (rename → autonumber)
+                        var bulkAction = (action === 'rename') ? 'autonumber' : action;
+                        bulkResolve(bulkAction, modal);
+                    } else {
+                        modal.hide();
+                        // hidden.bs.modal listener fires: conflictBusy=false → processConflictQueue()
+                    }
                 } else {
-                    // Inline error — user must correct before queue can advance
                     renameError.textContent   = data.info;
                     renameError.style.display = 'block';
                 }
             })
             .catch(() => toast('Network error during conflict resolution.'));
+        }
+
+        // Bulk-resolve all remaining queued conflicts without showing modal for each.
+        // Used when "Do this for all remaining conflicts" is checked.
+        function bulkResolve(action, modal) {
+            var remaining = conflictQueue.slice();
+            conflictQueue = [];
+            modal.hide();
+
+            function resolveNext(items) {
+                if (items.length === 0) return;
+                var item = items.shift();
+                var fd   = new FormData();
+                fd.append('upload_resolve', '1');
+                fd.append('action',   action);
+                fd.append('p',        '<?php echo fm_enc(FM_PATH) ?>');
+                fd.append('fullpath', item.path);
+                fd.append('new_name', '');
+                fd.append('token',    '<?php echo $_SESSION['token'] ?>');
+                fetch('<?php echo htmlspecialchars(FM_SELF_URL) ?>?p=<?php echo fm_enc(FM_PATH) ?>', {
+                    method: 'POST', body: fd
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') toast(data.info);
+                    else toast('Conflict error: ' + data.info);
+                    resolveNext(items);
+                })
+                .catch(() => { toast('Network error during bulk resolve.'); resolveNext(items); });
+            }
+            resolveNext(remaining);
         }
     </script>
 <?php
