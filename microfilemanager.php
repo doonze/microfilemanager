@@ -151,11 +151,6 @@ $max_upload_size_bytes = 5000000000; // size 5,000,000,000 bytes (~5GB)
 // eg. decrease to 1MB if nginx reports problem 413 entity too large
 $upload_chunk_size_bytes = 2000000; // chunk size 2,000,000 bytes (~2MB)
 
-// Automatically open the OS file picker when the Upload page loads.
-// true  => file picker opens immediately on page load (skip the extra click)
-// false => standard behavior, user must click the dropzone to open picker
-$upload_auto_open_picker = true;
-
 // Possible rules are 'OFF', 'AND' or 'OR'
 // OFF => Don't check connection IP, defaults to OFF
 // AND => Connection must be on the whitelist, and not on the blacklist
@@ -1774,11 +1769,6 @@ if (isset($_GET['upload']) && !FM_READONLY) {
                 }).on("error", function(file, response) {
                     toast(response);
                 });
-                <?php if (!empty($upload_auto_open_picker)): ?>
-                // Auto-open the OS file picker when the upload page loads
-                var dz = this;
-                setTimeout(function() { dz.hiddenFileInput.click(); }, 150);
-                <?php endif; ?>
             }
         };
 
@@ -4393,17 +4383,20 @@ function fm_show_header_login()
         <script type="text/javascript">
             window.csrf = '<?php echo $_SESSION['token']; ?>';
             // Global handler: any AJAX 401 with error=session_expired → reload to login
-            $(document).on('ajaxError', function(event, jqXHR) {
-                if (jqXHR.status === 401) {
-                    try {
-                        var resp = JSON.parse(jqXHR.responseText);
-                        if (resp.error === 'session_expired') {
-                            window.onbeforeunload = null;
-                            window.location.reload();
-                        }
-                    } catch(e) {}
-                }
-            });
+            // Guarded: upload page loads jQuery after this block
+            if (typeof $ !== 'undefined') {
+                $(document).on('ajaxError', function(event, jqXHR) {
+                    if (jqXHR.status === 401) {
+                        try {
+                            var resp = JSON.parse(jqXHR.responseText);
+                            if (resp.error === 'session_expired') {
+                                window.onbeforeunload = null;
+                                window.location.reload();
+                            }
+                        } catch(e) {}
+                    }
+                });
+            }
         </script>
         <style>
             html {
