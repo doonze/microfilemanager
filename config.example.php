@@ -117,6 +117,11 @@ $directories_users = array(
 // Decrease (e.g. 1000000 = 1MB) if your server returns 413 Entity Too Large.
 // $upload_chunk_size_bytes = 2000000;  // ~2 MB
 
+// Automatically open the OS file picker when the Upload page loads.
+// true  => file picker opens immediately (skip the extra click) — MFM default
+// false => standard behavior, user must click the dropzone
+// $upload_auto_open_picker = true;
+
 // ─── IP Filtering ─────────────────────────────────────────────────────────────
 // 'OFF' => disabled (default)
 // 'AND' => must be on whitelist AND not on blacklist
