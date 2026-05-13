@@ -25,6 +25,13 @@ $auth_users = array(
     // 'guest'     => '$2y$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
 );
 
+// Session timeout in seconds — how long an idle session stays alive before
+// the user is redirected to the login page.
+// Default: 14400 (4 hours).
+// $session_timeout = 14400;  // 4 hours
+// $session_timeout = 3600;   // 1 hour
+// $session_timeout = 86400;  // 24 hours
+
 // ─── Readonly Users ───────────────────────────────────────────────────────────
 // MERGED with readonly_users in microfilemanager.php — duplicates removed.
 // Users listed here can browse and view but not upload, edit, or delete.

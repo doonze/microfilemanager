@@ -28,6 +28,11 @@ define('APP_TITLE', 'Micro File Manager');
 // Is independent from IP white- and blacklisting
 $use_auth = true;
 
+// Session lifetime in seconds — how long before an idle session expires
+// and the user is sent back to the login page.
+// Default: 14400 (4 hours). Override in config.php.
+$session_timeout = 14400;
+
 // Login user name and password
 // Users: array('Username' => 'Password', 'Username2' => 'Password2', ...)
 // Generate secure password hash - https://tinyfilemanager.github.io/docs/pwd.html
@@ -280,6 +285,9 @@ if (defined('FM_EMBED')) {
     }
 
     session_cache_limiter('nocache'); // Prevent logout issue after page was cached
+    // Apply session lifetime BEFORE session_start()
+    ini_set('session.gc_maxlifetime', $session_timeout);
+    session_set_cookie_params($session_timeout);
     session_name(FM_SESSION_ID);
     function session_error_handling_function($code, $msg, $file, $line)
     {
@@ -502,6 +510,15 @@ defined('FM_DATETIME_FORMAT') || define('FM_DATETIME_FORMAT', $datetime_format);
 unset($p, $use_auth, $iconv_input_encoding, $use_highlightjs, $highlightjs_style);
 
 /*************************** ACTIONS ***************************/
+
+// If an AJAX request arrives but the session has expired, return 401 JSON
+// so the client can redirect cleanly to the login page instead of silently
+// failing (e.g. editor save appearing to succeed but actually doing nothing).
+if (FM_USE_AUTH && isset($_POST['ajax']) && !isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_ID]['logged']])) {
+    header('HTTP/1.1 401 Unauthorized');
+    header('Content-Type: application/json');
+    die(json_encode(['error' => 'session_expired']));
+}
 
 // Handle all AJAX Request
 if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_ID]['logged']]) || !FM_USE_AUTH) && isset($_POST['ajax'], $_POST['token'])) {
@@ -4365,6 +4382,18 @@ function fm_show_header_login()
         <?php endif; ?>
         <script type="text/javascript">
             window.csrf = '<?php echo $_SESSION['token']; ?>';
+            // Global handler: any AJAX 401 with error=session_expired → reload to login
+            $(document).on('ajaxError', function(event, jqXHR) {
+                if (jqXHR.status === 401) {
+                    try {
+                        var resp = JSON.parse(jqXHR.responseText);
+                        if (resp.error === 'session_expired') {
+                            window.onbeforeunload = null;
+                            window.location.reload();
+                        }
+                    } catch(e) {}
+                }
+            });
         </script>
         <style>
             html {
@@ -5281,6 +5310,14 @@ function fm_show_header_login()
                                 }
                             },
                             error: function(mes) {
+                                // 401 session_expired — global ajaxError handler
+                                // will reload to login page; suppress toast here
+                                if (mes.status === 401) {
+                                    try {
+                                        var r = JSON.parse(mes.responseText);
+                                        if (r.error === 'session_expired') return;
+                                    } catch(e) {}
+                                }
                                 var msg = "Save failed";
                                 try {
                                     var json = JSON.parse(mes.responseText);
