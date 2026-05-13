@@ -3,6 +3,15 @@
 All notable changes to Micro File Manager are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+> **Convention:** The moment a version is committed, it is locked. All new work goes
+> into the next version's section immediately. We are always working on the next version.
+
+---
+
+## [3.2] - Unreleased
+
+*(nothing yet)*
+
 ---
 
 ## [3.1] - 2026-05-13
