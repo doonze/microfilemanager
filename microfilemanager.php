@@ -301,6 +301,26 @@ if (defined('FM_EMBED')) {
     set_error_handler('session_error_handling_function');
     session_start();
     restore_error_handler();
+
+    // Application-level session timeout — bypasses Debian's system cron GC
+    // which ignores ini_set('session.gc_maxlifetime') and uses php.ini directly,
+    // causing sessions to die at the system default (~24 min) regardless.
+    // We track last_activity in the session and expire it ourselves.
+    if (isset($_SESSION[FM_SESSION_ID]['logged'])) {
+        if (isset($_SESSION['fm_last_activity']) && (time() - $_SESSION['fm_last_activity']) > $session_timeout) {
+            // Session has been idle longer than $session_timeout — log out cleanly.
+            session_unset();
+            session_destroy();
+            // Restart a clean session so the login form works (CSRF token etc.).
+            session_start();
+        } else {
+            // Still active — refresh the timestamp on every request.
+            $_SESSION['fm_last_activity'] = time();
+        }
+    } elseif (!isset($_SESSION['fm_last_activity'])) {
+        // Not logged in yet — seed the timestamp so it's ready after login.
+        $_SESSION['fm_last_activity'] = time();
+    }
 }
 
 //Generating CSRF Token
@@ -392,6 +412,7 @@ if ($use_auth) {
         if (function_exists('password_verify')) {
             if (isset($auth_users[$_POST['fm_usr']]) && isset($_POST['fm_pwd']) && password_verify($_POST['fm_pwd'], $auth_users[$_POST['fm_usr']]) && verifyToken($_POST['token'])) {
                 $_SESSION[FM_SESSION_ID]['logged'] = $_POST['fm_usr'];
+                $_SESSION['fm_last_activity'] = time(); // seed activity timestamp on login
                 fm_set_msg(lng('You are logged in'));
                 fm_redirect(FM_SELF_URL);
             } else {
@@ -525,6 +546,14 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
     if (!verifyToken($_POST['token'])) {
         header('HTTP/1.0 401 Unauthorized');
         die("Invalid Token.");
+    }
+
+    // Session ping — client heartbeat to detect expiry while idle.
+    // The 401 gate above fires first if the session is already dead,
+    // so reaching here means the session is still alive.
+    if (isset($_POST['type']) && $_POST['type'] === 'session_ping') {
+        echo json_encode(['alive' => true]);
+        exit();
     }
 
     //search : get list of files from the current folder
@@ -4496,6 +4525,38 @@ function fm_show_header_login()
                     }
                 });
             }
+
+            // Session heartbeat — pings every 2 minutes so an idle user gets
+            // redirected to login automatically when their session expires,
+            // rather than only discovering it when they click something.
+            // Skips when the tab is hidden to avoid pointless background requests.
+            <?php if (FM_USE_AUTH): ?>
+            (function() {
+                var PING_INTERVAL = 2 * 60 * 1000; // 2 minutes
+                function pingSession() {
+                    if (document.hidden) return;
+                    var fd = new FormData();
+                    fd.append('ajax',  '1');
+                    fd.append('type',  'session_ping');
+                    fd.append('token', window.csrf);
+                    fetch(window.location.pathname + window.location.search, {
+                        method: 'POST', body: fd, credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                        if (r.status === 401) {
+                            window.onbeforeunload = null;
+                            window.location.reload();
+                        }
+                    })
+                    .catch(function() {}); // network hiccup — try again next interval
+                }
+                setInterval(pingSession, PING_INTERVAL);
+                // Also ping immediately on tab-return in case it expired while hidden.
+                document.addEventListener('visibilitychange', function() {
+                    if (!document.hidden) pingSession();
+                });
+            })();
+            <?php endif; ?>
         </script>
         <style>
             html {

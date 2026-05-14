@@ -14,6 +14,18 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Version number now displayed on the login page title (`Micro File Manager 3.2`)
 
 ### Fixed
+- **Session timeout not respected on Debian Linux** — `ini_set('session.gc_maxlifetime')`
+  is ignored by Debian's system cron (`/etc/cron.d/php` → `sessionclean`) which reads
+  `gc_maxlifetime` directly from `php.ini`, causing sessions to die at the system default
+  (~24 min) regardless of the configured `$session_timeout`. Fixed with application-level
+  timeout tracking: `fm_last_activity` stored in the session, checked on every request,
+  session destroyed when idle time exceeds `$session_timeout`. Seeded on login.
+- **Expired session not detected while idle** — the 401 redirect only fired when the user
+  performed an action (editor save, file op, etc.), so a user sitting idle would not be
+  sent to the login screen until they clicked something. Added a 2-minute JS heartbeat
+  (`session_ping` AJAX type) that detects expiry while idle and immediately reloads to
+  the login page. Heartbeat skips hidden tabs and fires once on tab-return. Only active
+  when `FM_USE_AUTH` is enabled.
 - **Upload conflict resolution fails silently on symlinked directories** — clicking Overwrite
   (or Rename/Auto-number) when the upload destination is a symlink (`ln -s`) caused the
   conflict modal to hang and dismiss without finalizing the file, leaving a `.part` orphan.
