@@ -35,7 +35,7 @@ $session_timeout = 14400;
 
 // Brute-force login protection — overridable in config.php
 // Lock out an IP after $login_max_attempts consecutive failures for $login_lockout_minutes.
-$login_max_attempts    = 5;   // consecutive failures before lockout
+$login_max_attempts    = 3;   // consecutive failures before lockout
 $login_lockout_minutes = 15;  // lockout duration in minutes
 
 // Login user name and password

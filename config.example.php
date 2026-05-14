@@ -35,7 +35,7 @@ $auth_users = array(
 // ─── Brute-Force Protection ───────────────────────────────────────────────────
 // How many consecutive failed logins from one IP trigger a lockout.
 // Default: 5 attempts, 15 minute lockout.
-// $login_max_attempts    = 5;   // lock after this many consecutive failures
+// $login_max_attempts    = 3;   // lock after this many consecutive failures
 // $login_lockout_minutes = 15;  // how long the lockout lasts (minutes)
 
 // ─── Readonly Users ───────────────────────────────────────────────────────────
