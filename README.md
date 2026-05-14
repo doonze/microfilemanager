@@ -6,6 +6,8 @@
 
 > Micro File Manager is a fork of [TinyFileManager](https://github.com/prasathmani/tinyfilemanager) — a versatile, lightweight, single-file PHP web file manager. Drop one PHP file onto any server and instantly get a full-featured file management UI in your browser. MFM builds on TFM's solid foundation with a focus on upgrade-safe configuration, bug fixes, and usability improvements.
 
+> **Branches & Releases:** [GitHub Releases](https://github.com/doonze/microfilemanager/releases) are stable, tested versions — grab the latest release if you just want to use MFM. The `master` branch always matches the latest release. The `dev` branch is active development towards the next version and may be unstable.
+
 <sub>**Caution!** _Avoid utilizing this script as a standard file manager in public spaces. It is imperative to remove this script from the server after completing any tasks._</sub>
 
 ## ✨ MFM Enhancements over TinyFileManager
