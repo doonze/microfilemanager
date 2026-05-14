@@ -13,6 +13,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - Version number now displayed on the login page title (`Micro File Manager 3.2`)
 
+### Added
+- **Brute-force login protection** — failed login attempts are tracked per IP (hashed,
+  never stored raw) in the system temp directory. After `$login_max_attempts` (default 5)
+  consecutive failures the IP is locked out for `$login_lockout_minutes` (default 15).
+  Lockout expires automatically; counter clears on successful login. Both values are
+  overridable in `config.php`. Uses `$_SERVER['REMOTE_ADDR']` only (not spoofable proxy
+  headers).
+- **Security headers** — sent on every response: `X-Frame-Options: SAMEORIGIN` (anti-
+  clickjacking), `X-Content-Type-Options: nosniff` (anti-MIME-sniff), `Referrer-Policy:
+  strict-origin-when-cross-origin`, `X-XSS-Protection: 1; mode=block`. `X-Powered-By`
+  header stripped to avoid leaking PHP version.
+- **Session fixation prevention** — `session_regenerate_id(true)` called on every
+  successful login so a pre-auth session ID can never be promoted to an authenticated one.
+
 ### Fixed
 - **Session timeout not respected on Debian Linux** — `ini_set('session.gc_maxlifetime')`
   is ignored by Debian's system cron (`/etc/cron.d/php` → `sessionclean`) which reads

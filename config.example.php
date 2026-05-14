@@ -32,6 +32,12 @@ $auth_users = array(
 // $session_timeout = 3600;   // 1 hour
 // $session_timeout = 86400;  // 24 hours
 
+// ─── Brute-Force Protection ───────────────────────────────────────────────────
+// How many consecutive failed logins from one IP trigger a lockout.
+// Default: 5 attempts, 15 minute lockout.
+// $login_max_attempts    = 5;   // lock after this many consecutive failures
+// $login_lockout_minutes = 15;  // how long the lockout lasts (minutes)
+
 // ─── Readonly Users ───────────────────────────────────────────────────────────
 // MERGED with readonly_users in microfilemanager.php — duplicates removed.
 // Users listed here can browse and view but not upload, edit, or delete.

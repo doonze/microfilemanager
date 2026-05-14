@@ -33,6 +33,11 @@ $use_auth = true;
 // Default: 14400 (4 hours). Override in config.php.
 $session_timeout = 14400;
 
+// Brute-force login protection — overridable in config.php
+// Lock out an IP after $login_max_attempts consecutive failures for $login_lockout_minutes.
+$login_max_attempts    = 5;   // consecutive failures before lockout
+$login_lockout_minutes = 15;  // lockout duration in minutes
+
 // Login user name and password
 // Users: array('Username' => 'Password', 'Username2' => 'Password2', ...)
 // Generate secure password hash - https://tinyfilemanager.github.io/docs/pwd.html
@@ -321,6 +326,59 @@ if (defined('FM_EMBED')) {
         // Not logged in yet — seed the timestamp so it's ready after login.
         $_SESSION['fm_last_activity'] = time();
     }
+
+    // ── Security headers — sent on every response ────────────────────────────
+    // Strip the PHP version banner — no need to advertise it.
+    header_remove('X-Powered-By');
+    // Prevent this page being framed by another origin (clickjacking defence).
+    header('X-Frame-Options: SAMEORIGIN');
+    // Stop browsers from MIME-sniffing the content type.
+    header('X-Content-Type-Options: nosniff');
+    // Don't send the full referrer URL to third-party origins.
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    // Legacy XSS filter — still respected by some older browsers.
+    header('X-XSS-Protection: 1; mode=block');
+
+    // ── Rate-limiter helpers — brute-force login protection ──────────────────
+    // State is stored in a JSON file in the system temp dir, keyed by a
+    // one-way hash of the IP so we never persist raw addresses.
+    // Each record: { attempts: int, locked_until: unix_timestamp|null }
+    function fm_rl_file($ip) {
+        $key = hash('sha256', 'mfm_rl_' . $ip);
+        return sys_get_temp_dir() . '/mfm_rl_' . $key . '.json';
+    }
+    function fm_rl_get($ip) {
+        $f = fm_rl_file($ip);
+        if (!file_exists($f)) return ['attempts' => 0, 'locked_until' => null];
+        $d = @json_decode(file_get_contents($f), true);
+        return is_array($d) ? $d : ['attempts' => 0, 'locked_until' => null];
+    }
+    function fm_rl_save($ip, $data) {
+        @file_put_contents(fm_rl_file($ip), json_encode($data), LOCK_EX);
+    }
+    function fm_rl_record_failure($ip, $max, $lockout_minutes) {
+        $d = fm_rl_get($ip);
+        $d['attempts']++;
+        $d['locked_until'] = ($d['attempts'] >= $max)
+            ? time() + ($lockout_minutes * 60)
+            : null;
+        fm_rl_save($ip, $d);
+        return $d;
+    }
+    function fm_rl_clear($ip) {
+        @unlink(fm_rl_file($ip));
+    }
+    function fm_rl_is_locked($ip) {
+        $d = fm_rl_get($ip);
+        if ($d['locked_until'] && time() < $d['locked_until']) {
+            return $d['locked_until']; // return expiry timestamp so we can show a countdown
+        }
+        // Lock expired — clear the record so the attempt counter resets.
+        if ($d['locked_until'] && time() >= $d['locked_until']) {
+            fm_rl_clear($ip);
+        }
+        return false;
+    }
 }
 
 //Generating CSRF Token
@@ -408,14 +466,31 @@ if ($use_auth) {
         // Logged
     } elseif (isset($_POST['fm_usr'], $_POST['fm_pwd'], $_POST['token'])) {
         // Logging In
+        //
+        // 1. Rate-limit check — bail immediately if IP is locked out.
+        $rl_ip     = $_SERVER['REMOTE_ADDR'] ?? '';
+        $rl_locked = fm_rl_is_locked($rl_ip);
+        if ($rl_locked !== false) {
+            $wait = max(1, (int)ceil(($rl_locked - time()) / 60));
+            fm_set_msg('Too many failed login attempts. Try again in ' . $wait . ' minute(s).', 'error');
+            fm_redirect(FM_SELF_URL);
+        }
+
+        // 2. Slow down every attempt to blunt timing attacks.
         sleep(1);
+
         if (function_exists('password_verify')) {
             if (isset($auth_users[$_POST['fm_usr']]) && isset($_POST['fm_pwd']) && password_verify($_POST['fm_pwd'], $auth_users[$_POST['fm_usr']]) && verifyToken($_POST['token'])) {
+                // Success — clear rate-limit record and prevent session fixation.
+                fm_rl_clear($rl_ip);
+                session_regenerate_id(true);
                 $_SESSION[FM_SESSION_ID]['logged'] = $_POST['fm_usr'];
-                $_SESSION['fm_last_activity'] = time(); // seed activity timestamp on login
+                $_SESSION['fm_last_activity'] = time();
                 fm_set_msg(lng('You are logged in'));
                 fm_redirect(FM_SELF_URL);
             } else {
+                // Failure — record the attempt; generic message to prevent user enumeration.
+                fm_rl_record_failure($rl_ip, $login_max_attempts, $login_lockout_minutes);
                 unset($_SESSION[FM_SESSION_ID]['logged']);
                 fm_set_msg(lng('Login failed. Invalid username or password'), 'error');
                 fm_redirect(FM_SELF_URL);
