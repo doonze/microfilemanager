@@ -3,7 +3,7 @@
 $CONFIG = '{"lang":"en","error_reporting":true,"show_hidden":false,"hide_Cols":false,"theme":"dark"}';
 
 /**
- * MFM ~ Micro File Manager V3.1
+ * MFM ~ Micro File Manager V3.2
  * @author Doonze
  * @github https://github.com/doonze/microfilemanager.git
  *
@@ -16,7 +16,7 @@ $CONFIG = '{"lang":"en","error_reporting":true,"show_hidden":false,"hide_Cols":f
  */
 
 //MFM version
-define('VERSION', '3.1');
+define('VERSION', '3.2');
 
 //Application Title
 define('APP_TITLE', 'Micro File Manager');
