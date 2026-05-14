@@ -3,7 +3,7 @@
 $CONFIG = '{"lang":"en","error_reporting":true,"show_hidden":false,"hide_Cols":false,"theme":"dark"}';
 
 /**
- * MFM ~ Micro File Manager V3.0
+ * MFM ~ Micro File Manager V3.1
  * @author Doonze
  * @github https://github.com/doonze/microfilemanager.git
  *
@@ -416,7 +416,7 @@ if ($use_auth) {
                                 <form class="form-signin" action="" method="post" autocomplete="off">
                                     <div class="mb-3">
                                         <div class="text-center">
-                                            <h1 class="card-title fw-bold"><?php echo APP_TITLE; ?></h1>
+                                            <h1 class="card-title fw-bold"><?php echo APP_TITLE . ' ' . VERSION; ?></h1>
                                         </div>
                                     </div>
                                     <hr />

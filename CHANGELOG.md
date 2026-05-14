@@ -10,7 +10,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [3.2] - Unreleased
 
-*(nothing yet)*
+### Added
+- Version number now displayed on the login page title (`Micro File Manager 3.2`)
 
 ---
 
