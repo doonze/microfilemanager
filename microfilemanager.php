@@ -1072,10 +1072,21 @@ if (isset($_POST['upload_resolve']) && !FM_READONLY) {
     $fullPath = $path . '/' . $fullPathInput;
     $partFile = $fullPath . '.part';
 
-    // Security: resolved path must stay inside FM_ROOT_PATH
-    $realRoot = realpath(FM_ROOT_PATH);
-    $realPart = realpath(dirname($partFile));
-    if ($realPart === false || strpos($realPart, $realRoot) !== 0) {
+    // Security: path must be within FM_ROOT_PATH.
+    // We accept if EITHER check passes:
+    //   1. Unresolved path starts with FM_ROOT_PATH — covers symlinked subdirectories
+    //      where realpath() would follow the link to a target outside FM_ROOT_PATH.
+    //      Safe because fm_clean_path() has already stripped all ../ traversal above.
+    //   2. Resolved (realpath) path starts with realpath(FM_ROOT_PATH) — the original
+    //      check, covers all non-symlink cases.
+    $partDir        = dirname($partFile);
+    $realRoot       = realpath(FM_ROOT_PATH);
+    $realPart       = realpath($partDir);
+    $normRoot       = rtrim(str_replace('\\', '/', FM_ROOT_PATH), '/');
+    $normPartDir    = rtrim(str_replace('\\', '/', $partDir), '/');
+    $insideByPath   = (strpos($normPartDir, $normRoot) === 0);
+    $insideByRealpath = ($realPart !== false && $realRoot !== false && strpos($realPart, $realRoot) === 0);
+    if (!$insideByPath && !$insideByRealpath) {
         echo json_encode(['status' => 'error', 'info' => 'Invalid path.']);
         exit;
     }

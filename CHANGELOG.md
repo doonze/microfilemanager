@@ -13,6 +13,19 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - Version number now displayed on the login page title (`Micro File Manager 3.2`)
 
+### Fixed
+- **Upload conflict resolution fails silently on symlinked directories** — clicking Overwrite
+  (or Rename/Auto-number) when the upload destination is a symlink (`ln -s`) caused the
+  conflict modal to hang and dismiss without finalizing the file, leaving a `.part` orphan.
+  Root cause: the `upload_resolve` security check used `realpath()` on the `.part` file's
+  directory, which follows symlinks to their real target path. That resolved path doesn't
+  start with `FM_ROOT_PATH`, so the check rejected the request as "Invalid path." — silently
+  because the error element wasn't prominent for the overwrite action.
+  Fix: dual-check approach — accept the path if EITHER the unresolved path starts with
+  `FM_ROOT_PATH` (safe because `fm_clean_path()` has already stripped all `../` traversal)
+  OR the `realpath()` check passes. Symlinked dirs pass the first check; normal dirs pass
+  either. No traversal risk introduced.
+
 ---
 
 ## [3.1] - 2026-05-13
