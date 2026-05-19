@@ -6217,22 +6217,44 @@ function fm_show_header_login()
         <?php if (isset($_GET['edit']) && isset($_GET['env']) && FM_EDIT_FILE && !FM_READONLY):
             $ext = pathinfo($_GET["edit"], PATHINFO_EXTENSION);
             // Map file extensions to ACE editor mode names.
-            // ACE mode names don't always match extensions (e.g. conf ≠ apache_conf).
+            // Extensions not listed fall through using the raw extension as the mode name
+            // (works when the extension exactly matches an ACE mode, e.g. css, json, php).
             $_ace_mode_map = [
-                // Web
+                // JavaScript / TypeScript
                 'js'          => 'javascript',
                 'mjs'         => 'javascript',
+                'es'          => 'javascript',
+                'es6'         => 'javascript',
                 'jsx'         => 'jsx',
                 'ts'          => 'typescript',
                 'tsx'         => 'tsx',
-                'vue'         => 'html',
-                'twig'        => 'twig',
+                'coffee'      => 'coffee',
+                'graphql'     => 'graphqlschema',
+                // HTML / templating
+                'htm'         => 'html',
+                'shtml'       => 'html',
+                'xhtml'       => 'html',
+                'tpl'         => 'html',
                 'mustache'    => 'html',
                 'handlebars'  => 'html',
                 'jinja'       => 'html',
+                'vue'         => 'html',
+                'twig'        => 'twig',
                 'cfm'         => 'coldfusion',
-                'coffee'      => 'coffee',
-                'graphql'     => 'graphqlschema',
+                'asp'         => 'html',
+                'aspx'        => 'html',
+                'jsp'         => 'html',
+                // XML variants
+                'xsl'         => 'xml',
+                'dtd'         => 'xml',
+                'svg'         => 'xml',
+                'asx'         => 'xml',
+                'asmx'        => 'xml',
+                'jspx'        => 'xml',
+                // Data
+                'map'         => 'json',
+                'lock'        => 'json',
+                'csv'         => 'text',
                 // Styles
                 'scss'        => 'scss',
                 'sass'        => 'sass',
@@ -6240,7 +6262,11 @@ function fm_show_header_login()
                 // Config / server
                 'conf'        => 'apache_conf',
                 'htaccess'    => 'apache_conf',
+                'htpasswd'    => 'apache_conf',
                 'vhost'       => 'apache_conf',
+                'config'      => 'ini',
+                'ini'         => 'ini',
+                'pls'         => 'ini',
                 'service'     => 'ini',
                 'timer'       => 'ini',
                 'socket'      => 'ini',
@@ -6248,36 +6274,62 @@ function fm_show_header_login()
                 'mount'       => 'ini',
                 'automount'   => 'ini',
                 'path'        => 'ini',
-                'env'         => 'sh',
-                'ini'         => 'ini',
                 'toml'        => 'toml',
                 'yml'         => 'yaml',
                 'yaml'        => 'yaml',
-                // Shell
+                // Shell / scripting
                 'sh'          => 'sh',
                 'bash'        => 'sh',
                 'zsh'         => 'sh',
+                'env'         => 'sh',
+                'cgi'         => 'perl',
                 'ps1'         => 'powershell',
                 'bat'         => 'batchfile',
-                // Systems languages
+                // PHP variants
+                'php4'        => 'php',
+                'php5'        => 'php',
+                'phps'        => 'php',
+                'phtml'       => 'php',
+                // Compiled / systems languages
                 'py'          => 'python',
                 'rb'          => 'ruby',
+                'ruby'        => 'ruby',
                 'go'          => 'golang',
                 'swift'       => 'swift',
                 'java'        => 'java',
                 'c'           => 'c_cpp',
                 'cpp'         => 'c_cpp',
+                'c++'         => 'c_cpp',
                 'cs'          => 'csharp',
                 'csx'         => 'csharp',
+                'ashx'        => 'csharp',
                 'cshtml'      => 'razor',
-                // Markup / data
+                'pl'          => 'perl',
+                // Markup / docs
                 'md'          => 'markdown',
                 'markdown'    => 'markdown',
                 'wiki'        => 'text',
-                'svg'         => 'xml',
-                'lock'        => 'json',
+                // Plain text catch-alls
+                'txt'         => 'text',
+                'log'         => 'text',
+                'passwd'      => 'text',
+                'ftpquota'    => 'text',
+                'gitignore'   => 'text',
+                'eml'         => 'text',
+                'msg'         => 'text',
+                'http'        => 'text',
+                'tmp'         => 'text',
+                'top'         => 'text',
+                'bot'         => 'text',
+                'dat'         => 'text',
+                'bak'         => 'text',
+                'm3u'         => 'text',
+                'm3u8'        => 'text',
+                'cue'         => 'text',
+                // Apple
+                'scpt'        => 'applescript',
+                'applescript' => 'applescript',
                 // Misc
-                'pl'          => 'perl',
                 'dockerfile'  => 'dockerfile',
             ];
             $ext = $_ace_mode_map[strtolower($ext)] ?? $ext;
