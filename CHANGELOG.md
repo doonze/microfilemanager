@@ -28,6 +28,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   successful login so a pre-auth session ID can never be promoted to an authenticated one.
 
 ### Fixed
+- **Session timeout ignored by Debian system cron** — Debian's `sessionclean` cron/timer
+  reads `session.gc_maxlifetime` directly from `php.ini` (typically 1440 s / 24 min) and
+  deletes session files on its own schedule, completely ignoring `ini_set()` at runtime.
+  MFM sessions are now stored in `./mfm_sessions/` (next to the PHP file) — a directory
+  the system cleanup never touches — so `$session_timeout` is fully respected. The
+  directory is created automatically with mode `0700`. An `.htaccess` (`Require all denied`)
+  is auto-dropped inside to block direct HTTP access on Apache. `mfm_sessions/` added to
+  `.gitignore`.
+
+### Fixed
 - **Session timeout not respected on Debian Linux** — `ini_set('session.gc_maxlifetime')`
   is ignored by Debian's system cron (`/etc/cron.d/php` → `sessionclean`) which reads
   `gc_maxlifetime` directly from `php.ini`, causing sessions to die at the system default

@@ -293,6 +293,23 @@ if (defined('FM_EMBED')) {
     // Apply session lifetime BEFORE session_start()
     ini_set('session.gc_maxlifetime', $session_timeout);
     session_set_cookie_params($session_timeout);
+
+    // Store MFM sessions in a local subdirectory next to the PHP file.
+    // Debian's system session-cleanup cron/timer reads session.save_path from
+    // php.ini — not our runtime ini_set — and deletes files based on the system
+    // default gc_maxlifetime (typically 1440 s / 24 min), ignoring $session_timeout.
+    // By pointing to a directory it doesn't know about, we own our session lifetime.
+    // .htaccess is dropped in automatically to block direct HTTP access on Apache.
+    $fm_session_dir = __DIR__ . '/mfm_sessions';
+    if (!is_dir($fm_session_dir)) {
+        mkdir($fm_session_dir, 0700, true);
+    }
+    $fm_htaccess = $fm_session_dir . '/.htaccess';
+    if (!file_exists($fm_htaccess)) {
+        file_put_contents($fm_htaccess, "Require all denied\n");
+    }
+    session_save_path($fm_session_dir);
+
     session_name(FM_SESSION_ID);
     function session_error_handling_function($code, $msg, $file, $line)
     {
