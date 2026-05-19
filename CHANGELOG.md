@@ -8,12 +8,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [3.2] - Unreleased
+## [3.3] - Unreleased
+
+---
+
+## [3.2] - 2026-05-19
 
 ### Added
-- Version number now displayed on the login page title (`Micro File Manager 3.2`)
-
-### Added
+- **Version number on login page** — title now shows `Micro File Manager 3.2`.
+  Auto-updates with every version bump.
 - **Brute-force login protection** — failed login attempts are tracked per IP (hashed,
   never stored raw) in the system temp directory. After `$login_max_attempts` (default 5)
   consecutive failures the IP is locked out for `$login_lockout_minutes` (default 15).
@@ -28,64 +31,36 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   successful login so a pre-auth session ID can never be promoted to an authenticated one.
 
 ### Fixed
-- **Settings save intermittent first-try failure** — `FM_Config::save()` previously
-  rewrote the target file in-place using `fopen("w")`, creating a window where any
-  concurrent request (session heartbeat, asset load, etc.) holding the file open would
-  cause the write to fail silently while the AJAX handler still echoed `true` — making
-  the save appear to succeed when it hadn't. Three-part fix:
-  1. **Atomic write** — content is written to `config.php.tmp` first, then `rename()`d
-     over `config.php`. `rename()` is OS-atomic; no concurrent request ever sees a
-     partially-written file.
-  2. **Proper error propagation** — `save()` now returns `true`/`false`. The AJAX
-     handler returns `{"success":true}` on success or a `500` with `{"success":false,
-     "error":"..."}` on failure. JS shows an `alert()` describing the problem instead
-     of silently reloading with nothing saved.
-  3. **Standalone mode no longer rewrites the running PHP file** — when `config.php`
-     doesn't exist, `save()` now bootstraps a minimal `config.php` instead of
-     rewriting `microfilemanager.php` itself. Rewriting the running file invalidated
-     OPcache and caused the first-try failure in standalone deployments.
-  4. **OPcache invalidated after write** — `opcache_invalidate($config_file, true)`
-     is called after a successful rename so the reloaded page immediately reflects
-     the new settings. Without this, OPcache served stale bytecode within its
-     revalidate window — toggle buttons visually reverted to their pre-save state
-     until OPcache naturally expired, even though the file on disk was correct.
-  The "sometimes the save action may not work on the first try" notice has been
-  removed from the settings page.
-
-### Fixed
 - **Session timeout ignored by Debian system cron** — Debian's `sessionclean` cron/timer
   reads `session.gc_maxlifetime` directly from `php.ini` (typically 1440 s / 24 min) and
   deletes session files on its own schedule, completely ignoring `ini_set()` at runtime.
-  MFM sessions are now stored in `./mfm_sessions/` (next to the PHP file) — a directory
-  the system cleanup never touches — so `$session_timeout` is fully respected. The
-  directory is created automatically with mode `0700`. An `.htaccess` (`Require all denied`)
-  is auto-dropped inside to block direct HTTP access on Apache. `mfm_sessions/` added to
-  `.gitignore`.
-
-### Fixed
-- **Session timeout not respected on Debian Linux** — `ini_set('session.gc_maxlifetime')`
-  is ignored by Debian's system cron (`/etc/cron.d/php` → `sessionclean`) which reads
-  `gc_maxlifetime` directly from `php.ini`, causing sessions to die at the system default
-  (~24 min) regardless of the configured `$session_timeout`. Fixed with application-level
-  timeout tracking: `fm_last_activity` stored in the session, checked on every request,
-  session destroyed when idle time exceeds `$session_timeout`. Seeded on login.
+  Fixed with two layers: (1) application-level `fm_last_activity` idle tracking so sessions
+  expire correctly regardless of server GC; (2) MFM sessions stored in `./mfm_sessions/`
+  next to the PHP file — a directory the system cleanup never touches — so
+  `$session_timeout` is fully respected. Directory created automatically with mode `0700`.
+  An `.htaccess` (`Require all denied`) is auto-dropped inside to block direct HTTP access
+  on Apache. `mfm_sessions/` added to `.gitignore`.
 - **Expired session not detected while idle** — the 401 redirect only fired when the user
-  performed an action (editor save, file op, etc.), so a user sitting idle would not be
-  sent to the login screen until they clicked something. Added a 2-minute JS heartbeat
+  performed an action (editor save, file op, etc.). Added a 2-minute JS heartbeat
   (`session_ping` AJAX type) that detects expiry while idle and immediately reloads to
   the login page. Heartbeat skips hidden tabs and fires once on tab-return. Only active
   when `FM_USE_AUTH` is enabled.
-- **Upload conflict resolution fails silently on symlinked directories** — clicking Overwrite
-  (or Rename/Auto-number) when the upload destination is a symlink (`ln -s`) caused the
-  conflict modal to hang and dismiss without finalizing the file, leaving a `.part` orphan.
-  Root cause: the `upload_resolve` security check used `realpath()` on the `.part` file's
-  directory, which follows symlinks to their real target path. That resolved path doesn't
-  start with `FM_ROOT_PATH`, so the check rejected the request as "Invalid path." — silently
-  because the error element wasn't prominent for the overwrite action.
-  Fix: dual-check approach — accept the path if EITHER the unresolved path starts with
-  `FM_ROOT_PATH` (safe because `fm_clean_path()` has already stripped all `../` traversal)
-  OR the `realpath()` check passes. Symlinked dirs pass the first check; normal dirs pass
-  either. No traversal risk introduced.
+- **Settings save intermittent first-try failure** — `FM_Config::save()` previously
+  rewrote the target file in-place using `fopen("w")`, creating a race condition where
+  any concurrent request holding the file open caused a silent write failure while the
+  AJAX handler still echoed `true`. Four-part fix: (1) atomic write via `config.php.tmp`
+  → `rename()`; (2) `save()` returns `true`/`false` — AJAX handler returns proper JSON,
+  JS shows an alert on failure instead of silently reloading; (3) standalone mode
+  bootstraps a new `config.php` instead of rewriting the running PHP file (which
+  invalidated OPcache); (4) `opcache_invalidate()` called after write so the reloaded
+  page reflects new settings immediately. The "sometimes the save action may not work
+  on the first try" notice removed from the settings page.
+- **Upload conflict resolution fails silently on symlinked directories** — `upload_resolve`
+  used `realpath()` which followed symlinks outside `FM_ROOT_PATH`, silently blocking all
+  conflict resolution on symlinked dirs. Dual-check fix: accept if unresolved path starts
+  with `FM_ROOT_PATH` OR `realpath()` check passes. No traversal risk introduced.
+- **Screenshot updated** — replaced legacy TinyFileManager screenshot with MFM-specific
+  6-frame walkthrough GIF (1901×954, 3 s per frame).
 
 ---
 
