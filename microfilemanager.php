@@ -3,7 +3,7 @@
 $CONFIG = '{"lang":"en","error_reporting":true,"show_hidden":false,"hide_Cols":false,"theme":"dark"}';
 
 /**
- * MFM ~ Micro File Manager V3.0
+ * MFM ~ Micro File Manager V3.2
  * @author Doonze
  * @github https://github.com/doonze/microfilemanager.git
  *
@@ -16,7 +16,7 @@ $CONFIG = '{"lang":"en","error_reporting":true,"show_hidden":false,"hide_Cols":f
  */
 
 //MFM version
-define('VERSION', '3.1');
+define('VERSION', '3.2');
 
 //Application Title
 define('APP_TITLE', 'Micro File Manager');
@@ -32,6 +32,11 @@ $use_auth = true;
 // and the user is sent back to the login page.
 // Default: 14400 (4 hours). Override in config.php.
 $session_timeout = 14400;
+
+// Brute-force login protection — overridable in config.php
+// Lock out an IP after $login_max_attempts consecutive failures for $login_lockout_minutes.
+$login_max_attempts    = 3;   // consecutive failures before lockout
+$login_lockout_minutes = 15;  // lockout duration in minutes
 
 // Login user name and password
 // Users: array('Username' => 'Password', 'Username2' => 'Password2', ...)
@@ -288,6 +293,23 @@ if (defined('FM_EMBED')) {
     // Apply session lifetime BEFORE session_start()
     ini_set('session.gc_maxlifetime', $session_timeout);
     session_set_cookie_params($session_timeout);
+
+    // Store MFM sessions in a local subdirectory next to the PHP file.
+    // Debian's system session-cleanup cron/timer reads session.save_path from
+    // php.ini — not our runtime ini_set — and deletes files based on the system
+    // default gc_maxlifetime (typically 1440 s / 24 min), ignoring $session_timeout.
+    // By pointing to a directory it doesn't know about, we own our session lifetime.
+    // .htaccess is dropped in automatically to block direct HTTP access on Apache.
+    $fm_session_dir = __DIR__ . '/mfm_sessions';
+    if (!is_dir($fm_session_dir)) {
+        mkdir($fm_session_dir, 0700, true);
+    }
+    $fm_htaccess = $fm_session_dir . '/.htaccess';
+    if (!file_exists($fm_htaccess)) {
+        file_put_contents($fm_htaccess, "Require all denied\n");
+    }
+    session_save_path($fm_session_dir);
+
     session_name(FM_SESSION_ID);
     function session_error_handling_function($code, $msg, $file, $line)
     {
@@ -301,6 +323,79 @@ if (defined('FM_EMBED')) {
     set_error_handler('session_error_handling_function');
     session_start();
     restore_error_handler();
+
+    // Application-level session timeout — bypasses Debian's system cron GC
+    // which ignores ini_set('session.gc_maxlifetime') and uses php.ini directly,
+    // causing sessions to die at the system default (~24 min) regardless.
+    // We track last_activity in the session and expire it ourselves.
+    if (isset($_SESSION[FM_SESSION_ID]['logged'])) {
+        if (isset($_SESSION['fm_last_activity']) && (time() - $_SESSION['fm_last_activity']) > $session_timeout) {
+            // Session has been idle longer than $session_timeout — log out cleanly.
+            session_unset();
+            session_destroy();
+            // Restart a clean session so the login form works (CSRF token etc.).
+            session_start();
+        } else {
+            // Still active — refresh the timestamp on every request.
+            $_SESSION['fm_last_activity'] = time();
+        }
+    } elseif (!isset($_SESSION['fm_last_activity'])) {
+        // Not logged in yet — seed the timestamp so it's ready after login.
+        $_SESSION['fm_last_activity'] = time();
+    }
+
+    // ── Security headers — sent on every response ────────────────────────────
+    // Strip the PHP version banner — no need to advertise it.
+    header_remove('X-Powered-By');
+    // Prevent this page being framed by another origin (clickjacking defence).
+    header('X-Frame-Options: SAMEORIGIN');
+    // Stop browsers from MIME-sniffing the content type.
+    header('X-Content-Type-Options: nosniff');
+    // Don't send the full referrer URL to third-party origins.
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    // Legacy XSS filter — still respected by some older browsers.
+    header('X-XSS-Protection: 1; mode=block');
+
+    // ── Rate-limiter helpers — brute-force login protection ──────────────────
+    // State is stored in a JSON file in the system temp dir, keyed by a
+    // one-way hash of the IP so we never persist raw addresses.
+    // Each record: { attempts: int, locked_until: unix_timestamp|null }
+    function fm_rl_file($ip) {
+        $key = hash('sha256', 'mfm_rl_' . $ip);
+        return sys_get_temp_dir() . '/mfm_rl_' . $key . '.json';
+    }
+    function fm_rl_get($ip) {
+        $f = fm_rl_file($ip);
+        if (!file_exists($f)) return ['attempts' => 0, 'locked_until' => null];
+        $d = @json_decode(file_get_contents($f), true);
+        return is_array($d) ? $d : ['attempts' => 0, 'locked_until' => null];
+    }
+    function fm_rl_save($ip, $data) {
+        @file_put_contents(fm_rl_file($ip), json_encode($data), LOCK_EX);
+    }
+    function fm_rl_record_failure($ip, $max, $lockout_minutes) {
+        $d = fm_rl_get($ip);
+        $d['attempts']++;
+        $d['locked_until'] = ($d['attempts'] >= $max)
+            ? time() + ($lockout_minutes * 60)
+            : null;
+        fm_rl_save($ip, $d);
+        return $d;
+    }
+    function fm_rl_clear($ip) {
+        @unlink(fm_rl_file($ip));
+    }
+    function fm_rl_is_locked($ip) {
+        $d = fm_rl_get($ip);
+        if ($d['locked_until'] && time() < $d['locked_until']) {
+            return $d['locked_until']; // return expiry timestamp so we can show a countdown
+        }
+        // Lock expired — clear the record so the attempt counter resets.
+        if ($d['locked_until'] && time() >= $d['locked_until']) {
+            fm_rl_clear($ip);
+        }
+        return false;
+    }
 }
 
 //Generating CSRF Token
@@ -388,13 +483,31 @@ if ($use_auth) {
         // Logged
     } elseif (isset($_POST['fm_usr'], $_POST['fm_pwd'], $_POST['token'])) {
         // Logging In
+        //
+        // 1. Rate-limit check — bail immediately if IP is locked out.
+        $rl_ip     = $_SERVER['REMOTE_ADDR'] ?? '';
+        $rl_locked = fm_rl_is_locked($rl_ip);
+        if ($rl_locked !== false) {
+            $wait = max(1, (int)ceil(($rl_locked - time()) / 60));
+            fm_set_msg('Too many failed login attempts. Try again in ' . $wait . ' minute(s).', 'error');
+            fm_redirect(FM_SELF_URL);
+        }
+
+        // 2. Slow down every attempt to blunt timing attacks.
         sleep(1);
+
         if (function_exists('password_verify')) {
             if (isset($auth_users[$_POST['fm_usr']]) && isset($_POST['fm_pwd']) && password_verify($_POST['fm_pwd'], $auth_users[$_POST['fm_usr']]) && verifyToken($_POST['token'])) {
+                // Success — clear rate-limit record and prevent session fixation.
+                fm_rl_clear($rl_ip);
+                session_regenerate_id(true);
                 $_SESSION[FM_SESSION_ID]['logged'] = $_POST['fm_usr'];
+                $_SESSION['fm_last_activity'] = time();
                 fm_set_msg(lng('You are logged in'));
                 fm_redirect(FM_SELF_URL);
             } else {
+                // Failure — record the attempt; generic message to prevent user enumeration.
+                fm_rl_record_failure($rl_ip, $login_max_attempts, $login_lockout_minutes);
                 unset($_SESSION[FM_SESSION_ID]['logged']);
                 fm_set_msg(lng('Login failed. Invalid username or password'), 'error');
                 fm_redirect(FM_SELF_URL);
@@ -416,7 +529,7 @@ if ($use_auth) {
                                 <form class="form-signin" action="" method="post" autocomplete="off">
                                     <div class="mb-3">
                                         <div class="text-center">
-                                            <h1 class="card-title fw-bold"><?php echo APP_TITLE; ?></h1>
+                                            <h1 class="card-title fw-bold"><?php echo APP_TITLE . ' ' . VERSION; ?></h1>
                                         </div>
                                     </div>
                                     <hr />
@@ -525,6 +638,14 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
     if (!verifyToken($_POST['token'])) {
         header('HTTP/1.0 401 Unauthorized');
         die("Invalid Token.");
+    }
+
+    // Session ping — client heartbeat to detect expiry while idle.
+    // The 401 gate above fires first if the session is already dead,
+    // so reaching here means the session is still alive.
+    if (isset($_POST['type']) && $_POST['type'] === 'session_ping') {
+        echo json_encode(['alive' => true]);
+        exit();
     }
 
     //search : get list of files from the current folder
@@ -645,11 +766,13 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
             $cfg->data['theme'] = $te3;
             $theme = $te3;
         }
-        $cfg->save();
-        echo true;
+        if ($cfg->save()) {
+            echo json_encode(['success' => true]);
+        } else {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Settings could not be saved. Check that the web server has write permission to the MFM directory.']);
+        }
     }
-
-    // new password hash
     if (isset($_POST['type']) && $_POST['type'] == "pwdhash") {
         $res = isset($_POST['inputPassword2']) && !empty($_POST['inputPassword2']) ? password_hash($_POST['inputPassword2'], PASSWORD_DEFAULT) : '';
         echo $res;
@@ -1072,10 +1195,21 @@ if (isset($_POST['upload_resolve']) && !FM_READONLY) {
     $fullPath = $path . '/' . $fullPathInput;
     $partFile = $fullPath . '.part';
 
-    // Security: resolved path must stay inside FM_ROOT_PATH
-    $realRoot = realpath(FM_ROOT_PATH);
-    $realPart = realpath(dirname($partFile));
-    if ($realPart === false || strpos($realPart, $realRoot) !== 0) {
+    // Security: path must be within FM_ROOT_PATH.
+    // We accept if EITHER check passes:
+    //   1. Unresolved path starts with FM_ROOT_PATH — covers symlinked subdirectories
+    //      where realpath() would follow the link to a target outside FM_ROOT_PATH.
+    //      Safe because fm_clean_path() has already stripped all ../ traversal above.
+    //   2. Resolved (realpath) path starts with realpath(FM_ROOT_PATH) — the original
+    //      check, covers all non-symlink cases.
+    $partDir        = dirname($partFile);
+    $realRoot       = realpath(FM_ROOT_PATH);
+    $realPart       = realpath($partDir);
+    $normRoot       = rtrim(str_replace('\\', '/', FM_ROOT_PATH), '/');
+    $normPartDir    = rtrim(str_replace('\\', '/', $partDir), '/');
+    $insideByPath   = (strpos($normPartDir, $normRoot) === 0);
+    $insideByRealpath = ($realPart !== false && $realRoot !== false && strpos($realPart, $realRoot) === 0);
+    if (!$insideByPath && !$insideByRealpath) {
         echo json_encode(['status' => 'error', 'info' => 'Invalid path.']);
         exit;
     }
@@ -2086,7 +2220,6 @@ if (isset($_GET['settings']) && !FM_READONLY) {
                         </div>
                     </div>
 
-                    <small class="text-body-secondary">* <?php echo lng('Sometimes the save action may not work on the first try, so please attempt it again') ?>.</small>
                 </form>
             </div>
         </div>
@@ -4150,20 +4283,46 @@ class FM_Config
     function save()
     {
         global $config_file;
-        $fm_file = is_readable($config_file) ? $config_file : __FILE__;
-        $var_name = '$CONFIG';
-        $var_value = var_export(json_encode($this->data), true);
-        $config_string = "<?php" . chr(13) . chr(10) . "//Default Configuration" . chr(13) . chr(10) . "$var_name = $var_value;" . chr(13) . chr(10);
-        if (is_writable($fm_file)) {
-            $lines = file($fm_file);
-            if ($fh = @fopen($fm_file, "w")) {
-                @fputs($fh, $config_string, strlen($config_string));
-                for ($x = 3; $x < count($lines); $x++) {
-                    @fputs($fh, $lines[$x], strlen($lines[$x]));
+        $var_value    = var_export(json_encode($this->data), true);
+        $config_string = "<?php" . chr(13) . chr(10)
+                       . "//Default Configuration" . chr(13) . chr(10)
+                       . "\$CONFIG = $var_value;" . chr(13) . chr(10);
+
+        if (is_readable($config_file)) {
+            // config.php exists — update the $CONFIG header (lines 0-2) and
+            // preserve everything from line 3 onward (the actual user settings).
+            $lines   = file($config_file);
+            $content = $config_string . implode('', array_slice($lines, 3));
+        } else {
+            // Standalone mode (no config.php yet): bootstrap a minimal
+            // config.php with just the $CONFIG line. This avoids rewriting
+            // the currently-executing microfilemanager.php, which would
+            // invalidate OPcache and cause bizarre first-try save failures.
+            // Subsequent saves will hit the is_readable branch above.
+            $content = $config_string;
+        }
+
+        // Atomic write: write to a temp file, then rename() over the target.
+        // rename() is OS-atomic — no concurrent request ever sees a
+        // partially-written file, eliminating the race condition that caused
+        // intermittent first-try failures when another request held config.php
+        // open during the write window.
+        $tmp = $config_file . '.tmp';
+        if (file_put_contents($tmp, $content, LOCK_EX) !== false) {
+            if (rename($tmp, $config_file)) {
+                // Flush OPcache for config.php so the very next request picks
+                // up the new settings immediately. Without this, OPcache serves
+                // old bytecode within its revalidate_freq window — the page
+                // reloads after save but shows the previous toggle state until
+                // the cache naturally expires.
+                if (function_exists('opcache_invalidate')) {
+                    opcache_invalidate($config_file, true);
                 }
-                @fclose($fh);
+                return true;
             }
         }
+        @unlink($tmp); // clean up orphaned temp file on failure
+        return false;
     }
 }
 
@@ -4485,6 +4644,38 @@ function fm_show_header_login()
                     }
                 });
             }
+
+            // Session heartbeat — pings every 2 minutes so an idle user gets
+            // redirected to login automatically when their session expires,
+            // rather than only discovering it when they click something.
+            // Skips when the tab is hidden to avoid pointless background requests.
+            <?php if (FM_USE_AUTH): ?>
+            (function() {
+                var PING_INTERVAL = 2 * 60 * 1000; // 2 minutes
+                function pingSession() {
+                    if (document.hidden) return;
+                    var fd = new FormData();
+                    fd.append('ajax',  '1');
+                    fd.append('type',  'session_ping');
+                    fd.append('token', window.csrf);
+                    fetch(window.location.pathname + window.location.search, {
+                        method: 'POST', body: fd, credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                        if (r.status === 401) {
+                            window.onbeforeunload = null;
+                            window.location.reload();
+                        }
+                    })
+                    .catch(function() {}); // network hiccup — try again next interval
+                }
+                setInterval(pingSession, PING_INTERVAL);
+                // Also ping immediately on tab-return in case it expired while hidden.
+                document.addEventListener('visibilitychange', function() {
+                    if (!document.hidden) pingSession();
+                });
+            })();
+            <?php endif; ?>
         </script>
         <style>
             html {
@@ -5446,8 +5637,25 @@ function fm_show_header_login()
                     url: form.attr('action'),
                     data: form.serialize() + "&token=" + window.csrf + "&ajax=" + true,
                     success: function(data) {
-                        if (data) {
-                            window.location.reload();
+                        try {
+                            var res = (typeof data === 'string') ? JSON.parse(data) : data;
+                            if (res && res.success) {
+                                window.location.reload();
+                            } else {
+                                alert('Settings save failed: ' + (res.error || 'Unknown error'));
+                            }
+                        } catch(e) {
+                            // Fallback: old plain-text 'true' response from an
+                            // un-updated server file — treat it as success.
+                            if (data) window.location.reload();
+                        }
+                    },
+                    error: function(xhr) {
+                        try {
+                            var res = JSON.parse(xhr.responseText);
+                            alert('Settings save failed: ' + (res.error || xhr.statusText));
+                        } catch(e) {
+                            alert('Settings save failed. Check that the web server has write permission to the MFM directory.');
                         }
                     }
                 });

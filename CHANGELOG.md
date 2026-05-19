@@ -8,9 +8,59 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [3.2] - Unreleased
+## [3.3] - Unreleased
 
-*(nothing yet)*
+---
+
+## [3.2] - 2026-05-19
+
+### Added
+- **Version number on login page** — title now shows `Micro File Manager 3.2`.
+  Auto-updates with every version bump.
+- **Brute-force login protection** — failed login attempts are tracked per IP (hashed,
+  never stored raw) in the system temp directory. After `$login_max_attempts` (default 5)
+  consecutive failures the IP is locked out for `$login_lockout_minutes` (default 15).
+  Lockout expires automatically; counter clears on successful login. Both values are
+  overridable in `config.php`. Uses `$_SERVER['REMOTE_ADDR']` only (not spoofable proxy
+  headers).
+- **Security headers** — sent on every response: `X-Frame-Options: SAMEORIGIN` (anti-
+  clickjacking), `X-Content-Type-Options: nosniff` (anti-MIME-sniff), `Referrer-Policy:
+  strict-origin-when-cross-origin`, `X-XSS-Protection: 1; mode=block`. `X-Powered-By`
+  header stripped to avoid leaking PHP version.
+- **Session fixation prevention** — `session_regenerate_id(true)` called on every
+  successful login so a pre-auth session ID can never be promoted to an authenticated one.
+
+### Fixed
+- **Session timeout ignored by Debian system cron** — Debian's `sessionclean` cron/timer
+  reads `session.gc_maxlifetime` directly from `php.ini` (typically 1440 s / 24 min) and
+  deletes session files on its own schedule, completely ignoring `ini_set()` at runtime.
+  Fixed with two layers: (1) application-level `fm_last_activity` idle tracking so sessions
+  expire correctly regardless of server GC; (2) MFM sessions stored in `./mfm_sessions/`
+  next to the PHP file — a directory the system cleanup never touches — so
+  `$session_timeout` is fully respected. Directory created automatically with mode `0700`.
+  An `.htaccess` (`Require all denied`) is auto-dropped inside to block direct HTTP access
+  on Apache. `mfm_sessions/` added to `.gitignore`.
+- **Expired session not detected while idle** — the 401 redirect only fired when the user
+  performed an action (editor save, file op, etc.). Added a 2-minute JS heartbeat
+  (`session_ping` AJAX type) that detects expiry while idle and immediately reloads to
+  the login page. Heartbeat skips hidden tabs and fires once on tab-return. Only active
+  when `FM_USE_AUTH` is enabled.
+- **Settings save intermittent first-try failure** — `FM_Config::save()` previously
+  rewrote the target file in-place using `fopen("w")`, creating a race condition where
+  any concurrent request holding the file open caused a silent write failure while the
+  AJAX handler still echoed `true`. Four-part fix: (1) atomic write via `config.php.tmp`
+  → `rename()`; (2) `save()` returns `true`/`false` — AJAX handler returns proper JSON,
+  JS shows an alert on failure instead of silently reloading; (3) standalone mode
+  bootstraps a new `config.php` instead of rewriting the running PHP file (which
+  invalidated OPcache); (4) `opcache_invalidate()` called after write so the reloaded
+  page reflects new settings immediately. The "sometimes the save action may not work
+  on the first try" notice removed from the settings page.
+- **Upload conflict resolution fails silently on symlinked directories** — `upload_resolve`
+  used `realpath()` which followed symlinks outside `FM_ROOT_PATH`, silently blocking all
+  conflict resolution on symlinked dirs. Dual-check fix: accept if unresolved path starts
+  with `FM_ROOT_PATH` OR `realpath()` check passes. No traversal risk introduced.
+- **Screenshot updated** — replaced legacy TinyFileManager screenshot with MFM-specific
+  6-frame walkthrough GIF (1901×954, 3 s per frame).
 
 ---
 
