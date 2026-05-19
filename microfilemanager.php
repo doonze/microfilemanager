@@ -6216,7 +6216,71 @@ function fm_show_header_login()
 
         <?php if (isset($_GET['edit']) && isset($_GET['env']) && FM_EDIT_FILE && !FM_READONLY):
             $ext = pathinfo($_GET["edit"], PATHINFO_EXTENSION);
-            $ext =  $ext == "js" ? "javascript" :  $ext;
+            // Map file extensions to ACE editor mode names.
+            // ACE mode names don't always match extensions (e.g. conf ≠ apache_conf).
+            $_ace_mode_map = [
+                // Web
+                'js'          => 'javascript',
+                'mjs'         => 'javascript',
+                'jsx'         => 'jsx',
+                'ts'          => 'typescript',
+                'tsx'         => 'tsx',
+                'vue'         => 'html',
+                'twig'        => 'twig',
+                'mustache'    => 'html',
+                'handlebars'  => 'html',
+                'jinja'       => 'html',
+                'cfm'         => 'coldfusion',
+                'coffee'      => 'coffee',
+                'graphql'     => 'graphqlschema',
+                // Styles
+                'scss'        => 'scss',
+                'sass'        => 'sass',
+                'less'        => 'less',
+                // Config / server
+                'conf'        => 'apache_conf',
+                'htaccess'    => 'apache_conf',
+                'vhost'       => 'apache_conf',
+                'service'     => 'ini',
+                'timer'       => 'ini',
+                'socket'      => 'ini',
+                'target'      => 'ini',
+                'mount'       => 'ini',
+                'automount'   => 'ini',
+                'path'        => 'ini',
+                'env'         => 'sh',
+                'ini'         => 'ini',
+                'toml'        => 'toml',
+                'yml'         => 'yaml',
+                'yaml'        => 'yaml',
+                // Shell
+                'sh'          => 'sh',
+                'bash'        => 'sh',
+                'zsh'         => 'sh',
+                'ps1'         => 'powershell',
+                'bat'         => 'batchfile',
+                // Systems languages
+                'py'          => 'python',
+                'rb'          => 'ruby',
+                'go'          => 'golang',
+                'swift'       => 'swift',
+                'java'        => 'java',
+                'c'           => 'c_cpp',
+                'cpp'         => 'c_cpp',
+                'cs'          => 'csharp',
+                'csx'         => 'csharp',
+                'cshtml'      => 'razor',
+                // Markup / data
+                'md'          => 'markdown',
+                'markdown'    => 'markdown',
+                'wiki'        => 'text',
+                'svg'         => 'xml',
+                'lock'        => 'json',
+                // Misc
+                'pl'          => 'perl',
+                'dockerfile'  => 'dockerfile',
+            ];
+            $ext = $_ace_mode_map[strtolower($ext)] ?? $ext;
             // Recompute write access here — fm_show_footer() has its own PHP scope
             $_ace_file = str_replace('/', '', fm_clean_path($_GET['edit'], false));
             $_ace_path = FM_ROOT_PATH . (FM_PATH != '' ? '/' . FM_PATH : '');
