@@ -13,9 +13,10 @@ RestartSec=5
 User=root
 Group=root
 
-# Runtime socket directory
+# Runtime socket directory — 0755 so www-data can traverse into it.
+# The socket itself is root:www-data 0660, so only www-data can connect.
 RuntimeDirectory=mfm-elevate
-RuntimeDirectoryMode=0750
+RuntimeDirectoryMode=0755
 
 # Harden the service where possible
 PrivateTmp=true
