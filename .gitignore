@@ -6,6 +6,9 @@ config.php
 # Runtime session storage — files are ephemeral, never commit.
 mfm_sessions/
 
+# Atomic write temp file — auto-cleaned, but ignored as a safety net.
+config.php.tmp
+
 # Local project context — contains personal paths and deployment notes.
 PROJECT_CONTEXT.md
 

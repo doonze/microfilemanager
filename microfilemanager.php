@@ -766,11 +766,13 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
             $cfg->data['theme'] = $te3;
             $theme = $te3;
         }
-        $cfg->save();
-        echo true;
+        if ($cfg->save()) {
+            echo json_encode(['success' => true]);
+        } else {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Settings could not be saved. Check that the web server has write permission to the MFM directory.']);
+        }
     }
-
-    // new password hash
     if (isset($_POST['type']) && $_POST['type'] == "pwdhash") {
         $res = isset($_POST['inputPassword2']) && !empty($_POST['inputPassword2']) ? password_hash($_POST['inputPassword2'], PASSWORD_DEFAULT) : '';
         echo $res;
@@ -2218,7 +2220,6 @@ if (isset($_GET['settings']) && !FM_READONLY) {
                         </div>
                     </div>
 
-                    <small class="text-body-secondary">* <?php echo lng('Sometimes the save action may not work on the first try, so please attempt it again') ?>.</small>
                 </form>
             </div>
         </div>
@@ -4282,20 +4283,36 @@ class FM_Config
     function save()
     {
         global $config_file;
-        $fm_file = is_readable($config_file) ? $config_file : __FILE__;
-        $var_name = '$CONFIG';
-        $var_value = var_export(json_encode($this->data), true);
-        $config_string = "<?php" . chr(13) . chr(10) . "//Default Configuration" . chr(13) . chr(10) . "$var_name = $var_value;" . chr(13) . chr(10);
-        if (is_writable($fm_file)) {
-            $lines = file($fm_file);
-            if ($fh = @fopen($fm_file, "w")) {
-                @fputs($fh, $config_string, strlen($config_string));
-                for ($x = 3; $x < count($lines); $x++) {
-                    @fputs($fh, $lines[$x], strlen($lines[$x]));
-                }
-                @fclose($fh);
-            }
+        $var_value    = var_export(json_encode($this->data), true);
+        $config_string = "<?php" . chr(13) . chr(10)
+                       . "//Default Configuration" . chr(13) . chr(10)
+                       . "\$CONFIG = $var_value;" . chr(13) . chr(10);
+
+        if (is_readable($config_file)) {
+            // config.php exists — update the $CONFIG header (lines 0-2) and
+            // preserve everything from line 3 onward (the actual user settings).
+            $lines   = file($config_file);
+            $content = $config_string . implode('', array_slice($lines, 3));
+        } else {
+            // Standalone mode (no config.php yet): bootstrap a minimal
+            // config.php with just the $CONFIG line. This avoids rewriting
+            // the currently-executing microfilemanager.php, which would
+            // invalidate OPcache and cause bizarre first-try save failures.
+            // Subsequent saves will hit the is_readable branch above.
+            $content = $config_string;
         }
+
+        // Atomic write: write to a temp file, then rename() over the target.
+        // rename() is OS-atomic — no concurrent request ever sees a
+        // partially-written file, eliminating the race condition that caused
+        // intermittent first-try failures when another request held config.php
+        // open during the write window.
+        $tmp = $config_file . '.tmp';
+        if (file_put_contents($tmp, $content, LOCK_EX) !== false) {
+            return rename($tmp, $config_file);
+        }
+        @unlink($tmp); // clean up orphaned temp file on failure
+        return false;
     }
 }
 
@@ -5610,8 +5627,25 @@ function fm_show_header_login()
                     url: form.attr('action'),
                     data: form.serialize() + "&token=" + window.csrf + "&ajax=" + true,
                     success: function(data) {
-                        if (data) {
-                            window.location.reload();
+                        try {
+                            var res = (typeof data === 'string') ? JSON.parse(data) : data;
+                            if (res && res.success) {
+                                window.location.reload();
+                            } else {
+                                alert('Settings save failed: ' + (res.error || 'Unknown error'));
+                            }
+                        } catch(e) {
+                            // Fallback: old plain-text 'true' response from an
+                            // un-updated server file — treat it as success.
+                            if (data) window.location.reload();
+                        }
+                    },
+                    error: function(xhr) {
+                        try {
+                            var res = JSON.parse(xhr.responseText);
+                            alert('Settings save failed: ' + (res.error || xhr.statusText));
+                        } catch(e) {
+                            alert('Settings save failed. Check that the web server has write permission to the MFM directory.');
                         }
                     }
                 });

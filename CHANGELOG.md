@@ -28,6 +28,26 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   successful login so a pre-auth session ID can never be promoted to an authenticated one.
 
 ### Fixed
+- **Settings save intermittent first-try failure** — `FM_Config::save()` previously
+  rewrote the target file in-place using `fopen("w")`, creating a window where any
+  concurrent request (session heartbeat, asset load, etc.) holding the file open would
+  cause the write to fail silently while the AJAX handler still echoed `true` — making
+  the save appear to succeed when it hadn't. Three-part fix:
+  1. **Atomic write** — content is written to `config.php.tmp` first, then `rename()`d
+     over `config.php`. `rename()` is OS-atomic; no concurrent request ever sees a
+     partially-written file.
+  2. **Proper error propagation** — `save()` now returns `true`/`false`. The AJAX
+     handler returns `{"success":true}` on success or a `500` with `{"success":false,
+     "error":"..."}` on failure. JS shows an `alert()` describing the problem instead
+     of silently reloading with nothing saved.
+  3. **Standalone mode no longer rewrites the running PHP file** — when `config.php`
+     doesn't exist, `save()` now bootstraps a minimal `config.php` instead of
+     rewriting `microfilemanager.php` itself. Rewriting the running file invalidated
+     OPcache and caused the first-try failure in standalone deployments.
+  The "sometimes the save action may not work on the first try" notice has been
+  removed from the settings page.
+
+### Fixed
 - **Session timeout ignored by Debian system cron** — Debian's `sessionclean` cron/timer
   reads `session.gc_maxlifetime` directly from `php.ini` (typically 1440 s / 24 min) and
   deletes session files on its own schedule, completely ignoring `ini_set()` at runtime.
