@@ -37,9 +37,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - **Daemon files** in new `elevate/` directory: `mfm-elevate.py`, `mfm-elevate.service`,
     `INSTALL.md`.
 
----
+### Fixed
+- **`/` as root path now works** — `rtrim($root_path, '\\/')` stripped the sole `/` to
+  an empty string, causing a false "Root path not found" error for any user whose root
+  was set to the filesystem root. Empty result is now restored to `'/'`.
 
-## [3.2] - 2026-05-19
 
 ### Added
 - **Version number on login page** — title now shows `Micro File Manager 3.2`.
