@@ -44,6 +44,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
      doesn't exist, `save()` now bootstraps a minimal `config.php` instead of
      rewriting `microfilemanager.php` itself. Rewriting the running file invalidated
      OPcache and caused the first-try failure in standalone deployments.
+  4. **OPcache invalidated after write** — `opcache_invalidate($config_file, true)`
+     is called after a successful rename so the reloaded page immediately reflects
+     the new settings. Without this, OPcache served stale bytecode within its
+     revalidate window — toggle buttons visually reverted to their pre-save state
+     until OPcache naturally expired, even though the file on disk was correct.
   The "sometimes the save action may not work on the first try" notice has been
   removed from the settings page.
 

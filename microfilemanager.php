@@ -4309,7 +4309,17 @@ class FM_Config
         // open during the write window.
         $tmp = $config_file . '.tmp';
         if (file_put_contents($tmp, $content, LOCK_EX) !== false) {
-            return rename($tmp, $config_file);
+            if (rename($tmp, $config_file)) {
+                // Flush OPcache for config.php so the very next request picks
+                // up the new settings immediately. Without this, OPcache serves
+                // old bytecode within its revalidate_freq window — the page
+                // reloads after save but shows the previous toggle state until
+                // the cache naturally expires.
+                if (function_exists('opcache_invalidate')) {
+                    opcache_invalidate($config_file, true);
+                }
+                return true;
+            }
         }
         @unlink($tmp); // clean up orphaned temp file on failure
         return false;
