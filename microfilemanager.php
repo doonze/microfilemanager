@@ -6341,10 +6341,7 @@ function fm_show_header_login()
             <?php print_external('js-ace'); ?>
             <script>
                 var editor = ace.edit("editor");
-                editor.getSession().setMode({
-                    path: "ace/mode/<?php echo $ext; ?>",
-                    inline: true
-                });
+                editor.getSession().setMode("ace/mode/<?php echo $ext; ?>");
                 <?php if (FM_ACE_THEME !== ''): ?>editor.setTheme("ace/theme/<?php echo htmlspecialchars(FM_ACE_THEME); ?>");<?php endif; ?>
                 editor.setShowPrintMargin(false); // Hide the vertical ruler
                 <?php if (!$_ace_file_writable): ?>editor.setReadOnly(true);<?php endif; ?>
