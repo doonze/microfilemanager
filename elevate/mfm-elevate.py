@@ -5,13 +5,13 @@ mfm-elevate — MicroFileManager privilege-elevation daemon
 Listens on a Unix socket and handles three actions:
 
     ping        → health check / daemon detection
-    check       → authenticate user via PAM, verify sudo-group membership,
-                  confirm write access to the target file
+    check       → authenticate user via PAM, verify write access to the target file
+                  (sudo group member OR file owner with write bit)
     write       → re-authenticate, then write file content as root
 
 Security rules (all enforced server-side, not in PHP):
   - Root is NEVER accepted as a username.
-  - User MUST be a member of the local sudo group.
+  - User MUST either be in the sudo group OR own the file with write permission.
   - Paths in BLOCKED_PATHS (and their children) are always refused.
   - File content is capped at MAX_CONTENT_BYTES.
   - Passwords are never written to the log.
@@ -24,6 +24,7 @@ import grp
 import json
 import logging
 import os
+import pwd
 import shutil
 import socket
 import stat
@@ -78,6 +79,29 @@ def user_in_sudo_group(username: str) -> bool:
     except KeyError:
         log.warning("sudo group '%s' not found on this system", SUDO_GROUP)
         return False
+
+
+def user_can_write(username: str, filepath: str) -> tuple:
+    """
+    Return (allowed: bool, reason: str) where reason is one of:
+      'sudo'  — user is in the sudo group (can write anything)
+      'owner' — user owns the file and has the owner-write bit set
+      ''      — neither; access denied
+
+    PAM authentication must be verified BEFORE calling this.
+    """
+    if user_in_sudo_group(username):
+        return True, "sudo"
+
+    try:
+        uid = pwd.getpwnam(username).pw_uid
+        st  = os.stat(filepath)
+        if st.st_uid == uid and (st.st_mode & stat.S_IWUSR):
+            return True, "owner"
+    except (KeyError, OSError):
+        pass
+
+    return False, ""
 
 
 def path_is_blocked(filepath: str) -> bool:
@@ -177,9 +201,10 @@ def handle_check(req: dict) -> dict:
         log.warning("check: PAM auth FAILED for user '%s' on '%s'", username, filepath)
         return {"ok": False, "error": "Authentication failed. Check username and password."}
 
-    if not user_in_sudo_group(username):
-        log.warning("check: user '%s' is not in the sudo group", username)
-        return {"ok": False, "error": "User does not have sudo privileges."}
+    allowed, reason = user_can_write(username, filepath)
+    if not allowed:
+        log.warning("check: user '%s' denied for '%s' (not sudo, not owner)", username, filepath)
+        return {"ok": False, "error": "Access denied: user does not have sudo privileges and does not own this file."}
 
     # File must exist (we're elevating to edit an existing file, not create one)
     if not os.path.exists(filepath):
@@ -188,7 +213,7 @@ def handle_check(req: dict) -> dict:
     if os.path.isdir(filepath):
         return {"ok": False, "error": "Path is a directory, not a file."}
 
-    log.info("check: OK — user '%s' authorised for '%s'", username, filepath)
+    log.info("check: OK — user '%s' authorised for '%s' (via %s)", username, filepath, reason)
     return {"ok": True}
 
 
@@ -220,16 +245,17 @@ def handle_write(req: dict) -> dict:
         log.warning("write: PAM auth FAILED for user '%s' on '%s'", username, filepath)
         return {"ok": False, "error": "Authentication failed."}
 
-    if not user_in_sudo_group(username):
-        log.warning("write: user '%s' is not in the sudo group", username)
-        return {"ok": False, "error": "User does not have sudo privileges."}
+    allowed, reason = user_can_write(username, filepath)
+    if not allowed:
+        log.warning("write: user '%s' denied for '%s' (not sudo, not owner)", username, filepath)
+        return {"ok": False, "error": "Access denied: user does not have sudo privileges and does not own this file."}
 
     if not os.path.isfile(filepath):
         return {"ok": False, "error": "File not found or is not a regular file."}
 
     try:
         atomic_write(filepath, content)
-        log.info("write: OK — '%s' wrote '%s'", username, filepath)
+        log.info("write: OK — '%s' wrote '%s' (via %s)", username, filepath, reason)
         return {"ok": True}
     except Exception as exc:
         log.error("write: FAILED '%s' → '%s': %s", username, filepath, exc)
