@@ -3998,7 +3998,15 @@ function fm_get_text_exts()
         'bak',
         'htpasswd',
         'pl',
-        'ps1'
+        'ps1',
+        'service',
+        'timer',
+        'socket',
+        'target',
+        'mount',
+        'automount',
+        'path',
+        'env'
     );
 }
 
