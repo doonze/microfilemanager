@@ -60,6 +60,20 @@ $readonly_users = array(
 // Global readonly, including when auth is not being used
 $global_readonly = false;
 
+// Privilege elevation — mfm-elevate daemon socket path.
+// Must match SOCKET_PATH in mfm-elevate.py. Overridable in config.php.
+$elevate_socket = '/run/mfm-elevate/mfm-elevate.sock';
+
+// Paths MFM will refuse to view OR edit, regardless of elevation status.
+// The daemon enforces its own blocklist independently — both must pass.
+// Children of listed paths are also blocked. Overridable in config.php.
+$elevate_view_blocked = [
+    '/etc/sudoers',
+    '/etc/sudoers.d',
+    '/etc/shadow',
+    '/etc/gshadow',
+];
+
 // Per-user root directories — each user lands in their own directory on login
 // Paths relative to $root_path unless absolute
 // array('Username' => 'Directory path', 'Username2' => 'Directory path', ...)
@@ -604,9 +618,14 @@ $p = isset($_GET['p']) ? $_GET['p'] : (isset($_POST['p']) ? $_POST['p'] : '');
 // clean path
 $p = fm_clean_path($p);
 
-// for ajax request - save
+// for ajax request - decode JSON body when sent as application/json
 $input = file_get_contents('php://input');
-$_POST = (strpos($input, 'ajax') != FALSE && strpos($input, 'save') != FALSE) ? json_decode($input, true) : $_POST;
+if ($input && strpos($input, '"ajax"') !== false) {
+    $decoded = json_decode($input, true);
+    if (is_array($decoded)) {
+        $_POST = $decoded;
+    }
+}
 
 // instead globals vars
 define('FM_PATH', $p);
@@ -633,7 +652,51 @@ if (FM_USE_AUTH && isset($_POST['ajax']) && !isset($_SESSION[FM_SESSION_ID]['log
     die(json_encode(['error' => 'session_expired']));
 }
 
-// Handle all AJAX Request
+// ── Privilege-elevation helpers ─────────────────────────────────────────────
+
+/**
+ * Send a JSON payload to the mfm-elevate Unix socket and return the decoded
+ * response array. Returns null on any connection or parse failure.
+ */
+function fm_elevate_send(string $socket_path, array $payload): ?array {
+    $ctx = @stream_socket_client('unix://' . $socket_path, $errno, $errstr, 3);
+    if (!$ctx) return null;
+    fwrite($ctx, json_encode($payload));
+    stream_socket_shutdown($ctx, STREAM_SHUT_WR);
+    $raw = '';
+    while (!feof($ctx)) {
+        $raw .= fread($ctx, 8192);
+    }
+    fclose($ctx);
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : null;
+}
+
+/**
+ * Ping the daemon. Returns true if the daemon is reachable and healthy.
+ */
+function fm_elevate_available(string $socket_path): bool {
+    if (!file_exists($socket_path)) return false;
+    $r = fm_elevate_send($socket_path, ['action' => 'ping']);
+    return isset($r['ok']) && $r['ok'] === true;
+}
+
+/**
+ * Return true if $filepath (resolved) is inside any of the $blocked list.
+ * Used in the PHP layer for view/edit blocking, independent of daemon checks.
+ */
+function fm_path_is_blocked(string $filepath, array $blocked): bool {
+    $real = realpath($filepath) ?: $filepath;
+    foreach ($blocked as $b) {
+        $rb = realpath($b) ?: $b;
+        if ($real === $rb || strpos($real, rtrim($rb, '/') . '/') === 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// ── Handle all AJAX Request ──────────────────────────────────────────────────
 if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_ID]['logged']]) || !FM_USE_AUTH) && isset($_POST['ajax'], $_POST['token'])) {
     if (!verifyToken($_POST['token'])) {
         header('HTTP/1.0 401 Unauthorized');
@@ -703,7 +766,87 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
         die(true);
     }
 
-    // backup files
+    // ── Elevation: pre-flight credential + access check ───────────────────────
+    if (isset($_POST['type']) && $_POST['type'] === 'elevate_check') {
+        global $elevate_socket, $elevate_view_blocked;
+        header('Content-Type: application/json');
+
+        $path = FM_ROOT_PATH;
+        if (FM_PATH != '') $path .= '/' . FM_PATH;
+        $file = fm_clean_path($_GET['edit'] ?? '', false);
+        $file = str_replace('/', '', $file);
+        $file_path = $path . '/' . $file;
+
+        if (!$file || !is_file($file_path)) {
+            die(json_encode(['ok' => false, 'error' => 'File not found.']));
+        }
+        if (fm_path_is_blocked($file_path, $elevate_view_blocked)) {
+            die(json_encode(['ok' => false, 'error' => 'That file is restricted.']));
+        }
+
+        $username = trim($_POST['username'] ?? '');
+        $password = $_POST['password'] ?? '';
+        if (!$username || !$password) {
+            die(json_encode(['ok' => false, 'error' => 'Username and password are required.']));
+        }
+
+        $r = fm_elevate_send($elevate_socket, [
+            'action'   => 'check',
+            'username' => $username,
+            'password' => $password,
+            'filepath' => realpath($file_path) ?: $file_path,
+        ]);
+        if ($r === null) {
+            die(json_encode(['ok' => false, 'error' => 'Could not reach elevation daemon.']));
+        }
+        die(json_encode($r));
+    }
+
+    // ── Elevation: privileged write ───────────────────────────────────
+    if (isset($_POST['type']) && $_POST['type'] === 'elevate_write') {
+        global $elevate_socket, $elevate_view_blocked;
+        header('Content-Type: application/json');
+        header('X-XSS-Protection:0');
+
+        $path = FM_ROOT_PATH;
+        if (FM_PATH != '') $path .= '/' . FM_PATH;
+        $file = fm_clean_path($_GET['edit'] ?? '', false);
+        $file = str_replace('/', '', $file);
+        $file_path = $path . '/' . $file;
+
+        if (!$file || !is_file($file_path)) {
+            header('HTTP/1.1 404 Not Found');
+            die(json_encode(['ok' => false, 'error' => 'File not found.']));
+        }
+        if (fm_path_is_blocked($file_path, $elevate_view_blocked)) {
+            header('HTTP/1.1 403 Forbidden');
+            die(json_encode(['ok' => false, 'error' => 'That file is restricted.']));
+        }
+
+        $username = trim($_POST['username'] ?? '');
+        $password = $_POST['password'] ?? '';
+        $content  = $_POST['content'] ?? '';
+        if (!$username || !$password || $content === '') {
+            header('HTTP/1.1 400 Bad Request');
+            die(json_encode(['ok' => false, 'error' => 'Credentials required.']));
+        }
+
+        $r = fm_elevate_send($elevate_socket, [
+            'action'   => 'write',
+            'username' => $username,
+            'password' => $password,
+            'filepath' => realpath($file_path) ?: $file_path,
+            'content'  => $content,
+        ]);
+        if ($r === null) {
+            header('HTTP/1.1 503 Service Unavailable');
+            die(json_encode(['ok' => false, 'error' => 'Could not reach elevation daemon.']));
+        }
+        if (!($r['ok'] ?? false)) {
+            header('HTTP/1.1 403 Forbidden');
+        }
+        die(json_encode($r));
+    }
     if (isset($_POST['type']) && $_POST['type'] == "backup" && !empty($_POST['file'])) {
         $fileName = fm_clean_path($_POST['file']);
         $fullPath = FM_ROOT_PATH . '/';
@@ -2297,6 +2440,14 @@ if (isset($_GET['view'])) {
         fm_redirect(FM_SELF_URL . '?p=' . urlencode($FM_PATH));
     }
 
+    // Block sensitive paths from being viewed through MFM
+    global $elevate_view_blocked;
+    if (fm_path_is_blocked($path . '/' . $file, $elevate_view_blocked)) {
+        fm_set_msg('That file is restricted and cannot be viewed.', 'error');
+        $FM_PATH = FM_PATH;
+        fm_redirect(FM_SELF_URL . '?p=' . urlencode($FM_PATH));
+    }
+
     fm_show_header(); // HEADER
     fm_show_nav_path(FM_PATH); // current path
 
@@ -2508,6 +2659,14 @@ if (isset($_GET['edit']) && !FM_READONLY) {
         $FM_PATH = FM_PATH;
         fm_redirect(FM_SELF_URL . '?p=' . urlencode($FM_PATH));
     }
+
+    // Block sensitive paths from being edited through MFM
+    global $elevate_view_blocked, $elevate_socket;
+    if (fm_path_is_blocked($path . '/' . $file, $elevate_view_blocked)) {
+        fm_set_msg('That file is restricted and cannot be edited.', 'error');
+        $FM_PATH = FM_PATH;
+        fm_redirect(FM_SELF_URL . '?p=' . urlencode($FM_PATH));
+    }
     $editFile = ' : <i><b>' . $file . '</b></i>';
     header('X-XSS-Protection:0');
     fm_show_header(); // HEADER
@@ -2516,8 +2675,8 @@ if (isset($_GET['edit']) && !FM_READONLY) {
     $file_url = FM_ROOT_URL . fm_convert_win((FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $file);
     $file_path = $path . '/' . $file;
     $file_writable = is_writable($file_path); // used by buttons, keyboard shortcuts, and save handler
-
-    // normal editer
+    // Check if the elevation daemon is available (only matters for unwritable files)
+    $elevate_available = !$file_writable ? fm_elevate_available($elevate_socket) : false;
     $isNormalEditor = true;
     if (isset($_GET['env'])) {
         if ($_GET['env'] == "ace") {
@@ -2588,24 +2747,28 @@ if (isset($_GET['edit']) && !FM_READONLY) {
                     <a title="<?php echo lng('BackUp') ?>" class="btn btn-sm btn-outline-primary" href="javascript:void(0);" onclick="backup('<?php echo urlencode(trim(FM_PATH)) ?>','<?php echo urlencode($file) ?>')"><i class="fa fa-database"></i> <?php echo lng('BackUp') ?></a>
                     <?php if ($is_text) { ?>
                         <?php if (!$file_writable): ?>
-                            <span class="btn btn-sm btn-outline-warning disabled"><i class="fa fa-lock"></i> Read Only</span>
+                            <span id="mfm-readonly-badge" class="btn btn-sm btn-outline-warning disabled"><i class="fa fa-lock"></i> Read Only</span>
                         <?php endif; ?>
                         <?php if ($isNormalEditor) { ?>
                             <a title="Advanced" class="btn btn-sm btn-outline-primary" href="?p=<?php echo urlencode(trim(FM_PATH)) ?>&amp;edit=<?php echo urlencode($file) ?>&amp;env=ace"><i class="fa fa-pencil-square-o"></i> <?php echo lng('AdvancedEditor') ?></a>
-                            <button type="button" class="btn btn-sm <?php echo $file_writable ? 'btn-success' : 'btn-secondary'; ?>" name="Save" data-url="<?php echo fm_enc($file_url) ?>" onclick="edit_save(this,'nrl')" <?php echo $file_writable ? '' : 'disabled title="File is read-only"'; ?>><i class="fa fa-floppy-o"></i> Save
+                            <button type="button" id="mfm-save-btn" class="btn btn-sm <?php echo $file_writable ? 'btn-success' : 'btn-secondary'; ?>" name="Save" data-url="<?php echo fm_enc($file_url) ?>" onclick="edit_save(this,'nrl')" <?php echo $file_writable ? '' : 'disabled title="File is read-only"'; ?>><i class="fa fa-floppy-o"></i> <span id="mfm-save-label">Save</span>
                             </button>
                         <?php } else { ?>
                             <a title="Plain Editor" class="btn btn-sm btn-outline-primary" href="?p=<?php echo urlencode(trim(FM_PATH)) ?>&amp;edit=<?php echo urlencode($file) ?>"><i class="fa fa-text-height"></i> <?php echo lng('NormalEditor') ?></a>
-                            <button type="button" class="btn btn-sm <?php echo $file_writable ? 'btn-success' : 'btn-secondary'; ?>" name="Save" data-url="<?php echo fm_enc($file_url) ?>" onclick="edit_save(this,'ace')" <?php echo $file_writable ? '' : 'disabled title="File is read-only"'; ?>><i class="fa fa-floppy-o"></i> <?php echo lng('Save') ?>
+                            <button type="button" id="mfm-save-btn" class="btn btn-sm <?php echo $file_writable ? 'btn-success' : 'btn-secondary'; ?>" name="Save" data-url="<?php echo fm_enc($file_url) ?>" onclick="edit_save(this,'ace')" <?php echo $file_writable ? '' : 'disabled title="File is read-only"'; ?>><i class="fa fa-floppy-o"></i> <span id="mfm-save-label"><?php echo lng('Save') ?></span>
                             </button>
                         <?php } ?>
+                        <?php if (!$file_writable && $elevate_available): ?>
+                            <button type="button" id="mfm-elevate-btn" class="btn btn-sm btn-warning" onclick="mfmShowElevateModal()" title="Edit this file with elevated privileges"><i class="fa fa-bolt"></i> Elevate</button>
+                        <?php endif; ?>
                     <?php } ?>
                 </div>
             </div>
         </div>
         <?php
         if ($is_text && $isNormalEditor) {
-            echo '<textarea class="mt-2" id="normal-editor" rows="33" cols="120" style="width: 99.5%;">' . htmlspecialchars($content) . '</textarea>';
+            $ro_attr = $file_writable ? '' : ' readonly';
+            echo '<textarea class="mt-2" id="normal-editor" rows="33" cols="120" style="width: 99.5%;"' . $ro_attr . '>' . htmlspecialchars($content) . '</textarea>';
             if ($file_writable) {
                 echo '<script>document.addEventListener("keydown", function(e) {if ((window.navigator.platform.match("Mac") ? e.metaKey : e.ctrlKey)  && e.keyCode == 83) { e.preventDefault();edit_save(this,"nrl");}}, false);</script>';
             }
@@ -2614,8 +2777,15 @@ if (isset($_GET['edit']) && !FM_READONLY) {
         } else {
             fm_set_msg(lng('FILE EXTENSION HAS NOT SUPPORTED'), 'error');
         }
+        // Inject elevation state for JS
+        $ea = $elevate_available ? 'true' : 'false';
+        $editor_type = $isNormalEditor ? 'nrl' : 'ace';
+        echo '<script>';
+        echo 'window.mfmElevateAvailable=' . $ea . ';';
+        echo 'window.mfmEditorType=' . json_encode($editor_type) . ';';
+        echo 'window.mfmElevateState={active:false,username:"",password:""};';
+        echo '</script>';
         ?>
-    </div>
 <?php
     fm_show_footer();
     exit;
@@ -5409,7 +5579,37 @@ function fm_show_header_login()
             </div>
 
             <!-- Advance Search Modal -->
-            <div class="modal fade" id="searchModal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true" data-bs-theme="<?php echo FM_THEME; ?>">
+            <!-- Privilege Elevation Modal -->
+<div class="modal fade" id="mfm-elevate-modal" tabindex="-1" aria-labelledby="mfmElevateLabel" aria-hidden="true" data-bs-theme="<?php echo FM_THEME; ?>" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal-dialog" role="document">
+<div class="modal-content">
+<div class="modal-header bg-warning bg-opacity-25">
+    <h5 class="modal-title" id="mfmElevateLabel"><i class="fa fa-bolt"></i> Elevate Privileges</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<div class="modal-body">
+    <p class="text-muted mb-3">This file requires elevated privileges to edit. Enter your Linux system credentials to verify access before you begin.</p>
+    <div class="mb-3">
+        <label for="mfm-elevate-user" class="form-label">Linux Username</label>
+        <input type="text" class="form-control" id="mfm-elevate-user" autocomplete="username" placeholder="e.g. justin">
+    </div>
+    <div class="mb-3">
+        <label for="mfm-elevate-pass" class="form-label">Password</label>
+        <input type="password" class="form-control" id="mfm-elevate-pass" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter') mfmCheckElevate();">
+    </div>
+    <p id="mfm-elevate-msg" class="mb-0 fw-semibold"></p>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="button" class="btn btn-warning" id="mfm-elevate-check-btn" onclick="mfmCheckElevate()"><i class="fa fa-key"></i> Verify Access</button>
+    <button type="button" class="btn btn-danger" id="mfm-elevate-begin" onclick="mfmBeginElevatedEdit()" style="display:none;"><i class="fa fa-unlock"></i> Begin Editing</button>
+</div>
+</div>
+</div>
+</div>
+
+<div class="modal fade" id="searchModal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true" data-bs-theme="<?php echo FM_THEME; ?>">
                 <div class="modal-dialog modal-lg" role="document">
                     <div class="modal-content">
                         <div class="modal-header">
@@ -5572,6 +5772,43 @@ function fm_show_header_login()
             function edit_save(e, t) {
                 var n = "ace" == t ? editor.getSession().getValue() : document.getElementById("normal-editor").value;
                 if (typeof n !== 'undefined' && n !== null) {
+
+                    // ─ Elevated save path ─────────────────────────────────
+                    if (window.mfmElevateState && window.mfmElevateState.active) {
+                        $.ajax({
+                            type: "POST",
+                            url: window.location,
+                            data: JSON.stringify({
+                                ajax: true,
+                                token: window.csrf,
+                                type: 'elevate_write',
+                                username: window.mfmElevateState.username,
+                                password: window.mfmElevateState.password,
+                                content: n
+                            }),
+                            contentType: "application/json; charset=utf-8",
+                            success: function(res) {
+                                if (res && res.ok) {
+                                    toast("⚡ Saved (Elevated)");
+                                    window.onbeforeunload = function() { return; };
+                                } else {
+                                    var msg = (res && res.error) ? res.error : 'Elevated save failed.';
+                                    toast('<span style="color:#ff6b6b"><i class="fa fa-exclamation-triangle"></i> ' + msg + '</span>');
+                                }
+                            },
+                            error: function(mes) {
+                                if (mes.status === 401) {
+                                    try { var r = JSON.parse(mes.responseText); if (r.error === 'session_expired') return; } catch(e) {}
+                                }
+                                var msg = 'Elevated save failed.';
+                                try { var j = JSON.parse(mes.responseText); if (j.error) msg = j.error; } catch(e) {}
+                                toast('<span style="color:#ff6b6b"><i class="fa fa-exclamation-triangle"></i> ' + msg + '</span>');
+                            }
+                        });
+                        return;
+                    }
+
+                    // ─ Normal save path ─────────────────────────────────
                     if (true) {
                         var data = {
                             ajax: true,
@@ -5623,6 +5860,110 @@ function fm_show_header_login()
                         o.appendChild(c), a.appendChild(o), a.appendChild(cx), document.body.appendChild(a), a.submit()
                     }
                 }
+            }
+
+            function show_new_pwd() {
+                $(".js-new-pwd").toggleClass('hidden');
+            }
+
+            // ────────────────────────────────────────────────────────────────
+            // Privilege Elevation JS
+            // Functions only active when window.mfmElevateAvailable === true
+            // ────────────────────────────────────────────────────────────────
+
+            function mfmShowElevateModal() {
+                $('#mfm-elevate-modal').modal('show');
+                $('#mfm-elevate-user').val('');
+                $('#mfm-elevate-pass').val('');
+                $('#mfm-elevate-msg').text('').removeClass('text-danger text-success');
+                $('#mfm-elevate-begin').hide();
+                $('#mfm-elevate-check-btn').prop('disabled', false).text('Verify Access');
+            }
+
+            function mfmCheckElevate() {
+                var user = $('#mfm-elevate-user').val().trim();
+                var pass = $('#mfm-elevate-pass').val();
+                var $msg  = $('#mfm-elevate-msg');
+                var $btn  = $('#mfm-elevate-check-btn');
+
+                if (!user || !pass) {
+                    $msg.text('Please enter both username and password.').removeClass('text-success').addClass('text-danger');
+                    return;
+                }
+
+                $btn.prop('disabled', true).text('Checking…');
+                $msg.text('').removeClass('text-danger text-success');
+
+                $.ajax({
+                    type: 'POST',
+                    url: window.location,
+                    data: JSON.stringify({
+                        ajax: true,
+                        token: window.csrf,
+                        type: 'elevate_check',
+                        username: user,
+                        password: pass
+                    }),
+                    contentType: 'application/json; charset=utf-8',
+                    success: function(res) {
+                        if (res && res.ok) {
+                            $msg.text('✅ Access confirmed. You may now edit and save.').removeClass('text-danger').addClass('text-success');
+                            $('#mfm-elevate-begin').show();
+                            $btn.hide();
+                            // Stash credentials in memory for this session only
+                            window.mfmElevateState._pendingUser = user;
+                            window.mfmElevateState._pendingPass = pass;
+                        } else {
+                            var err = (res && res.error) ? res.error : 'Access denied.';
+                            $msg.text('❌ ' + err).removeClass('text-success').addClass('text-danger');
+                            $btn.prop('disabled', false).text('Verify Access');
+                        }
+                    },
+                    error: function(mes) {
+                        var err = 'Request failed.';
+                        try { var j = JSON.parse(mes.responseText); if (j.error) err = j.error; } catch(e) {}
+                        $msg.text('❌ ' + err).removeClass('text-success').addClass('text-danger');
+                        $btn.prop('disabled', false).text('Verify Access');
+                    }
+                });
+            }
+
+            function mfmBeginElevatedEdit() {
+                // Commit credentials and unlock the editor
+                window.mfmElevateState.active   = true;
+                window.mfmElevateState.username = window.mfmElevateState._pendingUser;
+                window.mfmElevateState.password = window.mfmElevateState._pendingPass;
+
+                // Update UI
+                $('#mfm-readonly-badge').hide();
+                $('#mfm-elevate-btn').hide();
+                var $saveBtn = $('#mfm-save-btn');
+                $saveBtn.removeClass('btn-secondary').addClass('btn-danger')
+                        .prop('disabled', false).removeAttr('title');
+                $('#mfm-save-label').text('Save (Elevated)');
+
+                // Unlock editor
+                if (window.mfmEditorType === 'ace' && typeof editor !== 'undefined') {
+                    editor.setReadOnly(false);
+                    editor.commands.addCommands([{
+                        name: 'save',
+                        bindKey: { win: 'Ctrl-S', mac: 'Command-S' },
+                        exec: function() { edit_save(this, 'ace'); }
+                    }]);
+                } else {
+                    var ta = document.getElementById('normal-editor');
+                    if (ta) {
+                        ta.removeAttribute('readonly');
+                        document.addEventListener('keydown', function(e) {
+                            if ((window.navigator.platform.match('Mac') ? e.metaKey : e.ctrlKey) && e.keyCode == 83) {
+                                e.preventDefault(); edit_save(this, 'nrl');
+                            }
+                        }, false);
+                    }
+                }
+
+                $('#mfm-elevate-modal').modal('hide');
+                toast('⚡ Elevated. Editor unlocked — Save (Elevated) is active.');
             }
 
             function show_new_pwd() {
@@ -5880,6 +6221,7 @@ function fm_show_header_login()
                 });
                 <?php if (FM_ACE_THEME !== ''): ?>editor.setTheme("ace/theme/<?php echo htmlspecialchars(FM_ACE_THEME); ?>");<?php endif; ?>
                 editor.setShowPrintMargin(false); // Hide the vertical ruler
+                <?php if (!$_ace_file_writable): ?>editor.setReadOnly(true);<?php endif; ?>
                 function ace_commend(cmd) {
                     editor.commands.exec(cmd, editor);
                 }
