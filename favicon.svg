@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Dark navy rounded background — matches MFM dark theme -->
+  <rect width="32" height="32" rx="6" fill="#0d1b2a"/>
+  <!-- Folder body -->
+  <rect x="4" y="13" width="24" height="14" rx="2" fill="#1d4ed8"/>
+  <!-- Folder top with tab -->
+  <path d="M4,13 L4,10 Q4,9 5,9 L13,9 L15,7 Q15.5,6 17,6 L27,6 Q28,6 28,7 L28,9 Q28,9 28,13 Z" fill="#2563eb"/>
+  <!-- Lightning bolt ⚡ (amber — same as the elevation UI) -->
+  <polygon points="19,13 13,21 17,21 14,27 20,20 16,20" fill="#fbbf24"/>
+</svg>

@@ -4593,9 +4593,12 @@ function fm_show_header_login()
         <meta name="author" content="Doonze">
         <meta name="robots" content="noindex, nofollow">
         <meta name="googlebot" content="noindex">
-        <?php if ($favicon_path) {
-            echo '<link rel="icon" href="' . fm_enc($favicon_path) . '" type="image/png">';
-        } ?>
+        <?php if ($favicon_path): ?>
+            <link rel="icon" href="<?php echo fm_enc($favicon_path) ?>" type="image/png">
+        <?php else: ?>
+            <link rel="icon" href="favicon.svg" type="image/svg+xml">
+            <link rel="icon" href="favicon.ico" sizes="32x32" type="image/x-icon">
+        <?php endif; ?>
         <title><?php echo fm_enc(APP_TITLE) ?></title>
         <?php print_external('pre-jsdelivr'); ?>
         <?php print_external('css-bootstrap'); ?>
@@ -4755,9 +4758,12 @@ function fm_show_header_login()
         <meta name="author" content="Doonze">
         <meta name="robots" content="noindex, nofollow">
         <meta name="googlebot" content="noindex">
-        <?php if ($favicon_path) {
-            echo '<link rel="icon" href="' . fm_enc($favicon_path) . '" type="image/png">';
-        } ?>
+        <?php if ($favicon_path): ?>
+            <link rel="icon" href="<?php echo fm_enc($favicon_path) ?>" type="image/png">
+        <?php else: ?>
+            <link rel="icon" href="favicon.svg" type="image/svg+xml">
+            <link rel="icon" href="favicon.ico" sizes="32x32" type="image/x-icon">
+        <?php endif; ?>
         <title><?php echo fm_enc(APP_TITLE) ?> | <?php echo (isset($_GET['view']) ? $_GET['view'] : ((isset($_GET['edit'])) ? $_GET['edit'] : "MFM")); ?></title>
         <?php print_external('pre-jsdelivr'); ?>
         <?php print_external('pre-cloudflare'); ?>
