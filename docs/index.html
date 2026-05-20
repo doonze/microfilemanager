@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Micro File Manager — a lightweight, single-file PHP web file manager.">
+    <title>Micro File Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" crossorigin="anonymous">
+    <style>
+        body { min-height: 100vh; display: flex; flex-direction: column; }
+        main { flex: 1; }
+        .hero { padding: 5rem 0 3rem; }
+        .feature-icon { font-size: 1.5rem; width: 2.5rem; }
+        .code-block {
+            background: var(--bs-tertiary-bg);
+            border-radius: 6px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+            border: 1px solid var(--bs-border-color);
+        }
+        footer a { text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar border-bottom">
+    <div class="container">
+        <span class="navbar-brand fw-bold">
+            <i class="fa fa-folder-open text-warning me-1"></i>
+            Micro File Manager
+        </span>
+        <div class="d-flex gap-2">
+            <a href="pwd.html" class="btn btn-sm btn-outline-warning">
+                <i class="fa fa-key me-1"></i>Password Tool
+            </a>
+            <a href="https://github.com/doonze/microfilemanager" class="btn btn-sm btn-outline-secondary" target="_blank">
+                <i class="fa fa-github me-1"></i>GitHub
+            </a>
+        </div>
+    </div>
+</nav>
+
+<!-- Hero -->
+<main>
+    <section class="hero text-center border-bottom">
+        <div class="container">
+            <h1 class="display-5 fw-bold mb-3">
+                <i class="fa fa-folder-open text-warning me-2"></i>Micro File Manager
+            </h1>
+            <p class="lead text-body-secondary mb-4 mx-auto" style="max-width:600px;">
+                A lightweight, single-file PHP web file manager. Drop one file on any server and instantly get a full-featured file management UI in your browser.
+            </p>
+            <div class="d-flex gap-3 justify-content-center flex-wrap mb-4">
+                <a href="https://github.com/doonze/microfilemanager/releases/latest" class="btn btn-success btn-lg" target="_blank">
+                    <i class="fa fa-download me-1"></i>Download Latest
+                </a>
+                <a href="https://github.com/doonze/microfilemanager" class="btn btn-outline-secondary btn-lg" target="_blank">
+                    <i class="fa fa-github me-1"></i>View on GitHub
+                </a>
+            </div>
+            <div class="d-flex gap-2 justify-content-center flex-wrap">
+                <img src="https://img.shields.io/github/release/doonze/microfilemanager.svg?style=flat-square" alt="Release">
+                <img src="https://img.shields.io/github/license/doonze/microfilemanager.svg?style=flat-square" alt="License">
+            </div>
+        </div>
+    </section>
+
+    <!-- Demo GIF -->
+    <section class="py-5 border-bottom">
+        <div class="container text-center">
+            <h2 class="h4 fw-bold mb-4">See It In Action</h2>
+            <img src="https://raw.githubusercontent.com/doonze/microfilemanager/master/screenshot.gif"
+                 alt="Micro File Manager demo" class="img-fluid rounded shadow" style="max-width:800px;">
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="py-5 border-bottom">
+        <div class="container">
+            <h2 class="h4 fw-bold text-center mb-4">Features</h2>
+            <div class="row g-4">
+                <div class="col-md-6 col-lg-4">
+                    <div class="d-flex gap-3">
+                        <div class="feature-icon text-warning"><i class="fa fa-file-code-o"></i></div>
+                        <div><strong>Single-file deploy</strong><br><span class="text-body-secondary small">Drop one PHP file on any server. No install, no composer, no dependencies.</span></div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="d-flex gap-3">
+                        <div class="feature-icon text-warning"><i class="fa fa-pencil"></i></div>
+                        <div><strong>ACE code editor</strong><br><span class="text-body-secondary small">Syntax highlighting for 150+ languages, 35+ themes, with full write-permission awareness.</span></div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="d-flex gap-3">
+                        <div class="feature-icon text-warning"><i class="fa fa-bolt"></i></div>
+                        <div><strong>Privilege elevation</strong><br><span class="text-body-secondary small">Edit root-owned system files via the optional mfm-elevate Python daemon. No sudo for www-data needed.</span></div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="d-flex gap-3">
+                        <div class="feature-icon text-warning"><i class="fa fa-shield"></i></div>
+                        <div><strong>Security built-in</strong><br><span class="text-body-secondary small">Brute-force protection, security headers, session fixation prevention, IP allow/block lists.</span></div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="d-flex gap-3">
+                        <div class="feature-icon text-warning"><i class="fa fa-upload"></i></div>
+                        <div><strong>Smart uploads</strong><br><span class="text-body-secondary small">Drag-and-drop with conflict resolution queue — overwrite, rename, or cancel per file.</span></div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <div class="d-flex gap-3">
+                        <div class="feature-icon text-warning"><i class="fa fa-wrench"></i></div>
+                        <div><strong>External config</strong><br><span class="text-body-secondary small">All settings in <code>config.php</code> — survives upgrades. Drop in a new MFM, your config is untouched.</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick install -->
+    <section class="py-5 border-bottom">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <h2 class="h4 fw-bold text-center mb-4">Quick Install</h2>
+                    <div class="code-block mb-3"># Download the latest release
+wget https://github.com/doonze/microfilemanager/releases/latest/download/microfilemanager.php
+
+# Drop it in your web root and open it in your browser</div>
+                    <p class="text-body-secondary text-center small">
+                        Optionally copy <code>config.example.php</code> to <code>config.php</code> and set your users and preferences there.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tools -->
+    <section class="py-5">
+        <div class="container text-center">
+            <h2 class="h4 fw-bold mb-4">Tools</h2>
+            <a href="pwd.html" class="card text-decoration-none d-inline-block p-4 shadow-sm" style="max-width:320px;">
+                <div class="h1 mb-2"><i class="fa fa-key text-warning"></i></div>
+                <h5 class="fw-bold mb-1">Password Hash Generator</h5>
+                <p class="text-body-secondary small mb-0">Generate a PHP bcrypt hash for your MFM users — runs entirely in your browser.</p>
+            </a>
+        </div>
+    </section>
+</main>
+
+<!-- Footer -->
+<footer class="border-top py-3 text-center text-body-secondary small">
+    &mdash;&mdash; &copy; <a href="https://github.com/doonze/microfilemanager" class="text-body-secondary" target="_blank">Micro File Manager</a>
+    &mdash; Forked from <a href="https://github.com/prasathmani/tinyfilemanager" class="text-body-secondary" target="_blank">TinyFileManager</a> &mdash;&mdash;
+</footer>
+
+</body>
+</html>
