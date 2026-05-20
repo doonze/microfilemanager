@@ -1,8 +1,8 @@
 # MFM Code Map — microfilemanager.php
 
-**File size:** ~282KB / 6,728 lines  
+**File size:** ~280KB / 6,638 lines  
 **Last mapped:** 2026-05-20 (v3.4 dev)  
-**Previous size:** ~291KB / 6,786 lines — reduced by ~2.7KB / 58 lines in dead-code cleanup
+**Previous size:** ~291KB / 6,786 lines — reduced by ~11KB / 148 lines total across cleanup passes
 
 ---
 
@@ -13,7 +13,21 @@
 | 1 | 🟡 Quality | `fm_show_nav_path()` | `$path2` assigned inline inside an HTML href attribute — confusing but not a bug |
 | 2 | 🟡 Quality | `fm_show_footer()` JS ~line 6129 | `confirmDailog` is a persistent typo (should be `confirmDialog`) — consistent throughout HTML + JS so safe to leave |
 
-### ✅ Fixed in v3.4 Cleanup (2026-05-20)
+### ✅ Fixed in v3.4 Cleanup Pass 2 (2026-05-20) — jQuery Removal
+
+| # | Was | Now |
+|---|-----|-----|
+| 1 | jQuery 3.6.1 CDN dependency | Removed entirely |
+| 2 | DataTables 1.13.1 (jQuery plugin) | DataTables 2.x standalone |
+| 3 | `$.ajax()` — 7 call sites | `mfmFetch()` using native `fetch()` |
+| 4 | `$()` DOM selectors throughout | `getElementById` / `querySelector` |
+| 5 | `.modal('show'/.hide')` jQuery Bootstrap calls | `bootstrap.Modal.getOrCreateInstance()` |
+| 6 | `previewImage` jQuery plugin (~30 lines) | 20-line vanilla JS overlay |
+| 7 | `$(document).ready()` | `DOMContentLoaded` event listener |
+| 8 | ACE toolbar + select wiring via jQuery | Vanilla `addEventListener` |
+| 9 | Global jQuery `ajaxError` handler | Built into `mfmFetch()` |
+
+### ✅ Fixed in v3.4 Cleanup Pass 1 (2026-05-20) — Dead Code
 
 | # | Was | Fixed |
 |---|-----|-------|

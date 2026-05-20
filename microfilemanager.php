@@ -229,8 +229,7 @@ $external = array(
     'js-ace' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.js"></script>',
     'js-bootstrap' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>',
     'js-dropzone' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.js"></script>',
-    'js-jquery' => '<script src="https://code.jquery.com/jquery-3.6.1.min.js" integrity="sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ=" crossorigin="anonymous"></script>',
-    'js-jquery-datatables' => '<script src="https://cdn.datatables.net/1.13.1/js/jquery.dataTables.min.js" crossorigin="anonymous" defer></script>',
+    'js-datatables' => '<script src="https://cdn.datatables.net/2.1.8/js/dataTables.min.js" crossorigin="anonymous" defer></script>',
     'js-highlightjs' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>',
     'pre-jsdelivr' => '',  // jsdelivr replaced by cdnjs — preconnect no longer needed
     'pre-cloudflare' => '<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin/><link rel="dns-prefetch" href="https://cdnjs.cloudflare.com"/>'
@@ -4721,7 +4720,6 @@ function fm_show_header_login()
     {
         ?>
         </div>
-        <?php print_external('js-jquery'); ?>
         <?php print_external('js-bootstrap'); ?>
     </body>
 
@@ -4769,19 +4767,47 @@ function fm_show_header_login()
         <?php endif; ?>
         <script type="text/javascript">
             window.csrf = '<?php echo $_SESSION['token']; ?>';
-            // Global handler: any AJAX 401 with error=session_expired → reload to login
-            // Guarded: upload page loads jQuery after this block
-            if (typeof $ !== 'undefined') {
-                $(document).on('ajaxError', function(event, jqXHR) {
-                    if (jqXHR.status === 401) {
-                        try {
-                            var resp = JSON.parse(jqXHR.responseText);
-                            if (resp.error === 'session_expired') {
+
+            // ── Central fetch helper ─────────────────────────────────────────
+            // mfmFetch(payload, opts)
+            //   payload : object  — will be JSON-stringified (default)
+            //   opts    : { form: HTMLFormElement }  — serialize form instead
+            // Returns a Promise that resolves to the parsed JSON response.
+            // Automatically reloads to login on 401 session_expired.
+            function mfmFetch(payload, opts) {
+                opts = opts || {};
+                var body, headers = {};
+                if (opts.form) {
+                    var params = new URLSearchParams(new FormData(opts.form));
+                    params.append('token', window.csrf);
+                    params.append('ajax', 'true');
+                    body = params.toString();
+                    headers['Content-Type'] = 'application/x-www-form-urlencoded';
+                } else {
+                    body = JSON.stringify(payload);
+                    headers['Content-Type'] = 'application/json; charset=utf-8';
+                }
+                return fetch(window.location.href, {
+                    method: 'POST',
+                    headers: headers,
+                    body: body
+                }).then(function(res) {
+                    if (res.status === 401) {
+                        return res.json().catch(function() { return {}; }).then(function(r) {
+                            if (r.error === 'session_expired') {
                                 window.onbeforeunload = null;
                                 window.location.reload();
                             }
-                        } catch(e) {}
+                            var e = new Error(r.error || 'Unauthorized'); e.status = 401; throw e;
+                        });
                     }
+                    if (!res.ok) {
+                        return res.text().then(function(t) {
+                            var e = new Error(t || res.statusText); e.status = res.status; throw e;
+                        });
+                    }
+                    var ct = res.headers.get('content-type') || '';
+                    return ct.indexOf('application/json') !== -1 ? res.json() : res.text();
                 });
             }
 
@@ -5655,9 +5681,8 @@ function fm_show_header_login()
     {
         ?>
         </div>
-        <?php print_external('js-jquery'); ?>
         <?php print_external('js-bootstrap'); ?>
-        <?php print_external('js-jquery-datatables'); ?>
+        <?php print_external('js-datatables'); ?>
         <?php if (FM_USE_HIGHLIGHTJS && isset($_GET['view'])): ?>
             <?php print_external('js-highlightjs'); ?>
             <script>
@@ -5687,9 +5712,9 @@ function fm_show_header_login()
 
             function rename(e, t) {
                 if (t) {
-                    $("#js-rename-from").val(t);
-                    $("#js-rename-to").val(t);
-                    $("#renameDailog").modal('show');
+                    document.getElementById('js-rename-from').value = t;
+                    document.getElementById('js-rename-to').value = t;
+                    bootstrap.Modal.getOrCreateInstance(document.getElementById('renameDailog')).show();
                 }
             }
 
@@ -5745,77 +5770,37 @@ function fm_show_header_login()
 
                     // ─ Elevated save path ─────────────────────────────────
                     if (window.mfmElevateState && window.mfmElevateState.active) {
-                        $.ajax({
-                            type: "POST",
-                            url: window.location,
-                            data: JSON.stringify({
-                                ajax: true,
-                                token: window.csrf,
-                                type: 'elevate_write',
-                                username: window.mfmElevateState.username,
-                                password: window.mfmElevateState.password,
-                                content: n
-                            }),
-                            contentType: "application/json; charset=utf-8",
-                            success: function(res) {
-                                if (res && res.ok) {
-                                    toast("⚡ Saved (Elevated)");
-                                    window.onbeforeunload = function() { return; };
-                                } else {
-                                    var msg = (res && res.error) ? res.error : 'Elevated save failed.';
-                                    toast('<span style="color:#ff6b6b"><i class="fa fa-exclamation-triangle"></i> ' + msg + '</span>');
-                                }
-                            },
-                            error: function(mes) {
-                                if (mes.status === 401) {
-                                    try { var r = JSON.parse(mes.responseText); if (r.error === 'session_expired') return; } catch(e) {}
-                                }
-                                var msg = 'Elevated save failed.';
-                                try { var j = JSON.parse(mes.responseText); if (j.error) msg = j.error; } catch(e) {}
+                        mfmFetch({
+                            ajax: true, token: window.csrf, type: 'elevate_write',
+                            username: window.mfmElevateState.username,
+                            password: window.mfmElevateState.password,
+                            content: n
+                        }).then(function(res) {
+                            if (res && res.ok) {
+                                toast('⚡ Saved (Elevated)');
+                                window.onbeforeunload = function() { return; };
+                            } else {
+                                var msg = (res && res.error) ? res.error : 'Elevated save failed.';
                                 toast('<span style="color:#ff6b6b"><i class="fa fa-exclamation-triangle"></i> ' + msg + '</span>');
                             }
+                        }).catch(function(err) {
+                            if (err.status === 401) return;
+                            var msg = err.message || 'Elevated save failed.';
+                            toast('<span style="color:#ff6b6b"><i class="fa fa-exclamation-triangle"></i> ' + msg + '</span>');
                         });
                         return;
                     }
 
                     // ─ Normal save path ─────────────────────────────────
-                    var data = {
-                        ajax: true,
-                        content: n,
-                        type: 'save',
-                        token: window.csrf
-                    };
-
-                    $.ajax({
-                        type: "POST",
-                        url: window.location,
-                        data: JSON.stringify(data),
-                        contentType: "application/json; charset=utf-8",
-                        success: function(mes) {
-                            toast("Saved Successfully");
-                            window.onbeforeunload = function() {
-                                return
-                            }
-                        },
-                        error: function(mes) {
-                            // 401 session_expired — global ajaxError handler
-                            // will reload to login page; suppress toast here
-                            if (mes.status === 401) {
-                                try {
-                                    var r = JSON.parse(mes.responseText);
-                                    if (r.error === 'session_expired') return;
-                                } catch(e) {}
-                            }
-                            var msg = "Save failed";
-                            try {
-                                var json = JSON.parse(mes.responseText);
-                                if (json.error) msg = json.error;
-                            } catch(e) {
-                                if (mes.responseText) msg = mes.responseText;
-                            }
-                            toast('<span style="color:#ff6b6b"><i class="fa fa-exclamation-triangle"></i> ' + msg + '</span>');
-                        }
-                    });
+                    mfmFetch({ ajax: true, content: n, type: 'save', token: window.csrf })
+                        .then(function() {
+                            toast('Saved Successfully');
+                            window.onbeforeunload = function() { return; };
+                        })
+                        .catch(function(err) {
+                            if (err.status === 401) return;
+                            toast('<span style="color:#ff6b6b"><i class="fa fa-exclamation-triangle"></i> ' + (err.message || 'Save failed') + '</span>');
+                        });
                 }
             }
 
@@ -5825,77 +5810,67 @@ function fm_show_header_login()
             // ────────────────────────────────────────────────────────────────
 
             function mfmShowElevateModal() {
-                $('#mfm-elevate-modal').modal('show');
-                $('#mfm-elevate-user').val('');
-                $('#mfm-elevate-pass').val('');
-                $('#mfm-elevate-msg').text('').removeClass('text-danger text-success');
-                $('#mfm-elevate-begin').hide();
-                $('#mfm-elevate-check-btn').prop('disabled', false).text('Verify Access');
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('mfm-elevate-modal')).show();
+                document.getElementById('mfm-elevate-user').value = '';
+                document.getElementById('mfm-elevate-pass').value = '';
+                var msg = document.getElementById('mfm-elevate-msg');
+                msg.textContent = '';
+                msg.classList.remove('text-danger', 'text-success');
+                document.getElementById('mfm-elevate-begin').style.display = 'none';
+                var btn = document.getElementById('mfm-elevate-check-btn');
+                btn.disabled = false;
+                btn.textContent = 'Verify Access';
             }
 
             function mfmCheckElevate() {
-                var user = $('#mfm-elevate-user').val().trim();
-                var pass = $('#mfm-elevate-pass').val();
-                var $msg  = $('#mfm-elevate-msg');
-                var $btn  = $('#mfm-elevate-check-btn');
+                var user = document.getElementById('mfm-elevate-user').value.trim();
+                var pass = document.getElementById('mfm-elevate-pass').value;
+                var msg  = document.getElementById('mfm-elevate-msg');
+                var btn  = document.getElementById('mfm-elevate-check-btn');
 
                 if (!user || !pass) {
-                    $msg.text('Please enter both username and password.').removeClass('text-success').addClass('text-danger');
+                    msg.textContent = 'Please enter both username and password.';
+                    msg.classList.remove('text-success'); msg.classList.add('text-danger');
                     return;
                 }
 
-                $btn.prop('disabled', true).text('Checking…');
-                $msg.text('').removeClass('text-danger text-success');
+                btn.disabled = true; btn.textContent = 'Checking…';
+                msg.textContent = ''; msg.classList.remove('text-danger', 'text-success');
 
-                $.ajax({
-                    type: 'POST',
-                    url: window.location,
-                    data: JSON.stringify({
-                        ajax: true,
-                        token: window.csrf,
-                        type: 'elevate_check',
-                        username: user,
-                        password: pass
-                    }),
-                    contentType: 'application/json; charset=utf-8',
-                    success: function(res) {
+                mfmFetch({ ajax: true, token: window.csrf, type: 'elevate_check', username: user, password: pass })
+                    .then(function(res) {
                         if (res && res.ok) {
-                            $msg.text('✅ Access confirmed. You may now edit and save.').removeClass('text-danger').addClass('text-success');
-                            $('#mfm-elevate-begin').show();
-                            $btn.hide();
-                            // Stash credentials in memory for this session only
+                            msg.textContent = '✅ Access confirmed. You may now edit and save.';
+                            msg.classList.remove('text-danger'); msg.classList.add('text-success');
+                            document.getElementById('mfm-elevate-begin').style.display = '';
+                            btn.style.display = 'none';
                             window.mfmElevateState._pendingUser = user;
                             window.mfmElevateState._pendingPass = pass;
                         } else {
                             var err = (res && res.error) ? res.error : 'Access denied.';
-                            $msg.text('❌ ' + err).removeClass('text-success').addClass('text-danger');
-                            $btn.prop('disabled', false).text('Verify Access');
+                            msg.textContent = '❌ ' + err;
+                            msg.classList.remove('text-success'); msg.classList.add('text-danger');
+                            btn.disabled = false; btn.textContent = 'Verify Access';
                         }
-                    },
-                    error: function(mes) {
-                        var err = 'Request failed.';
-                        try { var j = JSON.parse(mes.responseText); if (j.error) err = j.error; } catch(e) {}
-                        $msg.text('❌ ' + err).removeClass('text-success').addClass('text-danger');
-                        $btn.prop('disabled', false).text('Verify Access');
-                    }
-                });
+                    }).catch(function(err) {
+                        msg.textContent = '❌ ' + (err.message || 'Request failed.');
+                        msg.classList.remove('text-success'); msg.classList.add('text-danger');
+                        btn.disabled = false; btn.textContent = 'Verify Access';
+                    });
             }
 
             function mfmBeginElevatedEdit() {
-                // Commit credentials and unlock the editor
                 window.mfmElevateState.active   = true;
                 window.mfmElevateState.username = window.mfmElevateState._pendingUser;
                 window.mfmElevateState.password = window.mfmElevateState._pendingPass;
 
-                // Update UI
-                $('#mfm-readonly-badge').hide();
-                $('#mfm-elevate-btn').hide();
-                var $saveBtn = $('#mfm-save-btn');
-                $saveBtn.removeClass('btn-secondary').addClass('btn-danger')
-                        .prop('disabled', false).removeAttr('title');
-                $('#mfm-save-label').text('Save (Elevated)');
+                document.getElementById('mfm-readonly-badge').style.display = 'none';
+                document.getElementById('mfm-elevate-btn').style.display = 'none';
+                var saveBtn = document.getElementById('mfm-save-btn');
+                saveBtn.classList.remove('btn-secondary'); saveBtn.classList.add('btn-danger');
+                saveBtn.disabled = false; saveBtn.removeAttribute('title');
+                document.getElementById('mfm-save-label').textContent = 'Save (Elevated)';
 
-                // Unlock editor
                 if (window.mfmEditorType === 'ace' && typeof editor !== 'undefined') {
                     editor.setReadOnly(false);
                     editor.commands.addCommands([{
@@ -5915,244 +5890,180 @@ function fm_show_header_login()
                     }
                 }
 
-                $('#mfm-elevate-modal').modal('hide');
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('mfm-elevate-modal')).hide();
                 toast('⚡ Elevated. Editor unlocked — Save (Elevated) is active.');
             }
 
             function show_new_pwd() {
-                $(".js-new-pwd").toggleClass('hidden');
+                document.querySelector('.js-new-pwd').classList.toggle('hidden');
             }
 
             // Save Settings
-            function save_settings($this) {
-                let form = $($this);
-                $.ajax({
-                    type: form.attr('method'),
-                    url: form.attr('action'),
-                    data: form.serialize() + "&token=" + window.csrf + "&ajax=" + true,
-                    success: function(data) {
-                        try {
-                            var res = (typeof data === 'string') ? JSON.parse(data) : data;
-                            if (res && res.success) {
-                                window.location.reload();
-                            } else {
-                                alert('Settings save failed: ' + (res.error || 'Unknown error'));
-                            }
-                        } catch(e) {
-                            // Fallback: old plain-text 'true' response from an
-                            // un-updated server file — treat it as success.
-                            if (data) window.location.reload();
+            function save_settings(form) {
+                mfmFetch(null, { form: form })
+                    .then(function(res) {
+                        var data = (typeof res === 'string') ? JSON.parse(res) : res;
+                        if (data && data.success) {
+                            window.location.reload();
+                        } else {
+                            alert('Settings save failed: ' + (data.error || 'Unknown error'));
                         }
-                    },
-                    error: function(xhr) {
-                        try {
-                            var res = JSON.parse(xhr.responseText);
-                            alert('Settings save failed: ' + (res.error || xhr.statusText));
-                        } catch(e) {
-                            alert('Settings save failed. Check that the web server has write permission to the MFM directory.');
-                        }
-                    }
-                });
+                    }).catch(function(err) {
+                        alert('Settings save failed: ' + (err.message || 'Check that the web server has write permission to the MFM directory.'));
+                    });
                 return false;
             }
 
-            //Create new password hash
-            function new_password_hash($this) {
-                let form = $($this),
-                    $pwd = $("#js-pwd-result");
-                $pwd.val('');
-                $.ajax({
-                    type: form.attr('method'),
-                    url: form.attr('action'),
-                    data: form.serialize() + "&token=" + window.csrf + "&ajax=" + true,
-                    success: function(data) {
-                        if (data) {
-                            $pwd.val(data);
-                        }
-                    }
-                });
+            // Create new password hash
+            function new_password_hash(form) {
+                var pwd = document.getElementById('js-pwd-result');
+                pwd.value = '';
+                mfmFetch(null, { form: form })
+                    .then(function(data) { if (data) pwd.value = data; })
+                    .catch(function() {});
                 return false;
             }
 
-            // Upload files using URL @param {Object}
-            function upload_from_url($this) {
-                let form = $($this),
-                    resultWrapper = $("div#js-url-upload__list");
-                $.ajax({
-                    type: form.attr('method'),
-                    url: form.attr('action'),
-                    data: form.serialize() + "&token=" + window.csrf + "&ajax=" + true,
-                    beforeSend: function() {
-                        form.find("input[name=uploadurl]").attr("disabled", "disabled");
-                        form.find("button").hide();
-                        form.find(".lds-facebook").addClass('show-me');
-                    },
-                    success: function(data) {
-                        if (data) {
-                            data = JSON.parse(data);
-                            if (data.done) {
-                                resultWrapper.append('<div class="alert alert-success row">Uploaded Successful: ' + data.done.name + '</div>');
-                                form.find("input[name=uploadurl]").val('');
-                            } else if (data['fail']) {
-                                resultWrapper.append('<div class="alert alert-danger row">Error: ' + data.fail.message + '</div>');
-                            }
-                            form.find("input[name=uploadurl]").removeAttr("disabled");
-                            form.find("button").show();
-                            form.find(".lds-facebook").removeClass('show-me');
+            // Upload files using URL
+            function upload_from_url(form) {
+                var resultWrapper = document.getElementById('js-url-upload__list');
+                var urlInput = form.querySelector('input[name=uploadurl]');
+                var btn = form.querySelector('button');
+                var loader = form.querySelector('.lds-facebook');
+                urlInput.disabled = true;
+                btn.style.display = 'none';
+                loader.classList.add('show-me');
+                mfmFetch(null, { form: form })
+                    .then(function(res) {
+                        var data = (typeof res === 'string') ? JSON.parse(res) : res;
+                        if (data.done) {
+                            resultWrapper.insertAdjacentHTML('beforeend', '<div class="alert alert-success row">Uploaded Successful: ' + data.done.name + '</div>');
+                            urlInput.value = '';
+                        } else if (data.fail) {
+                            resultWrapper.insertAdjacentHTML('beforeend', '<div class="alert alert-danger row">Error: ' + data.fail.message + '</div>');
                         }
-                    },
-                    error: function(xhr) {
-                        form.find("input[name=uploadurl]").removeAttr("disabled");
-                        form.find("button").show();
-                        form.find(".lds-facebook").removeClass('show-me');
-                        console.error(xhr);
-                    }
-                });
+                    }).catch(function(err) {
+                        console.error(err);
+                    }).finally(function() {
+                        urlInput.disabled = false;
+                        btn.style.display = '';
+                        loader.classList.remove('show-me');
+                    });
                 return false;
             }
 
             // Search template
             function search_template(data) {
-                var response = "";
-                $.each(data, function(key, val) {
-                    response += `<li><a href="?p=${val.path}&view=${val.name}">${val.path}/${val.name}</a></li>`;
-                });
-                return response;
+                return data.map(function(val) {
+                    return '<li><a href="?p=' + val.path + '&view=' + val.name + '">' + val.path + '/' + val.name + '</a></li>';
+                }).join('');
             }
 
-            // Advance search
+            // Advanced search
             function fm_search() {
-                var searchTxt = $("input#advanced-search").val(),
-                    searchWrapper = $("ul#search-wrapper"),
-                    path = $("#js-search-modal").attr("href"),
-                    _html = "",
-                    $loader = $("div.lds-facebook");
-                if (!!searchTxt && searchTxt.length > 2 && path) {
-                    var data = {
-                        ajax: true,
-                        content: searchTxt,
-                        path: path,
-                        type: 'search',
-                        token: window.csrf
-                    };
-                    $.ajax({
-                        type: "POST",
-                        url: window.location,
-                        data: data,
-                        beforeSend: function() {
-                            searchWrapper.html('');
-                            $loader.addClass('show-me');
-                        },
-                        success: function(data) {
-                            $loader.removeClass('show-me');
-                            data = JSON.parse(data);
-                            if (data && data.length) {
-                                _html = search_template(data);
-                                searchWrapper.html(_html);
-                            } else {
-                                searchWrapper.html('<p class="m-2">No result found!<p>');
-                            }
-                        },
-                        error: function(xhr) {
-                            $loader.removeClass('show-me');
-                            searchWrapper.html('<p class="m-2">ERROR: Try again later!</p>');
-                        },
-                        failure: function(mes) {
-                            $loader.removeClass('show-me');
-                            searchWrapper.html('<p class="m-2">ERROR: Try again later!</p>');
-                        }
-                    });
+                var searchTxt = document.querySelector('input#advanced-search').value;
+                var searchWrapper = document.querySelector('ul#search-wrapper');
+                var path = document.getElementById('js-search-modal').getAttribute('href');
+                var loader = document.querySelector('div.lds-facebook');
+                if (searchTxt && searchTxt.length > 2 && path) {
+                    searchWrapper.innerHTML = '';
+                    loader.classList.add('show-me');
+                    mfmFetch({ ajax: true, content: searchTxt, path: path, type: 'search', token: window.csrf })
+                        .then(function(res) {
+                            var data = (typeof res === 'string') ? JSON.parse(res) : res;
+                            searchWrapper.innerHTML = (data && data.length) ? search_template(data) : '<p class="m-2">No result found!<p>';
+                        }).catch(function() {
+                            searchWrapper.innerHTML = '<p class="m-2">ERROR: Try again later!</p>';
+                        }).finally(function() {
+                            loader.classList.remove('show-me');
+                        });
                 } else {
-                    searchWrapper.html("OOPS: minimum 3 characters required!");
+                    searchWrapper.innerHTML = 'OOPS: minimum 3 characters required!';
                 }
             }
 
-            // action confirm dailog modal
-            function confirmDailog(e, id = 0, title = "Action", content = "", action = null) {
+            // Action confirm dialog modal
+            function confirmDailog(e, id, title, content, action) {
+                id = id || 0; title = title || 'Action'; content = content || ''; action = action || null;
                 e.preventDefault();
                 const tplObj = {
-                    id,
-                    title,
+                    id, title,
                     content: decodeURIComponent(content.replace(/\+/g, ' ')),
                     action
                 };
-                let tpl = $("#js-tpl-confirm").html();
-                $(".modal.confirmDailog").remove();
-                $('#wrapper').append(template(tpl, tplObj));
-                const $confirmDailog = $("#confirmDailog-" + tplObj.id);
-                $confirmDailog.modal('show');
+                var tpl = document.getElementById('js-tpl-confirm').innerHTML;
+                document.querySelectorAll('.modal.confirmDailog').forEach(function(el) { el.remove(); });
+                document.getElementById('wrapper').insertAdjacentHTML('beforeend', template(tpl, tplObj));
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmDailog-' + tplObj.id)).show();
                 return false;
             }
 
-            // on mouse hover image preview
-            ! function(s) {
-                s.previewImage = function(e) {
-                    var o = s(document),
-                        t = ".previewImage",
-                        a = s.extend({
-                            xOffset: 20,
-                            yOffset: -20,
-                            fadeIn: "fast",
-                            css: {
-                                padding: "5px",
-                                border: "1px solid #cccccc",
-                                "background-color": "#fff"
-                            },
-                            eventSelector: "[data-preview-image]",
-                            dataKey: "previewImage",
-                            overlayId: "preview-image-plugin-overlay"
-                        }, e);
-                    return o.off(t), o.on("mouseover" + t, a.eventSelector, function(e) {
-                        s("p#" + a.overlayId).remove();
-                        var o = s("<p>").attr("id", a.overlayId).css("position", "absolute").css("display", "none").append(s('<img class="c-preview-img">').attr("src", s(this).data(a.dataKey)));
-                        a.css && o.css(a.css), s("body").append(o), o.css("top", e.pageY + a.yOffset + "px").css("left", e.pageX + a.xOffset + "px").fadeIn(a.fadeIn)
-                    }), o.on("mouseout" + t, a.eventSelector, function() {
-                        s("#" + a.overlayId).remove()
-                    }), o.on("mousemove" + t, a.eventSelector, function(e) {
-                        s("#" + a.overlayId).css("top", e.pageY + a.yOffset + "px").css("left", e.pageX + a.xOffset + "px")
-                    }), this
-                }, s.previewImage()
-            }(jQuery);
+            // Image hover preview — lightweight vanilla replacement for the old jQuery plugin
+            (function() {
+                var overlay = document.createElement('div');
+                overlay.id = 'img-preview-overlay';
+                overlay.style.cssText = 'display:none;position:fixed;z-index:9999;pointer-events:none;padding:5px;border:1px solid #ccc;background:#fff;';
+                var img = document.createElement('img');
+                img.style.maxWidth = '200px'; img.style.maxHeight = '200px; display:block';
+                overlay.appendChild(img);
+                document.body.appendChild(overlay);
+                document.addEventListener('mouseover', function(e) {
+                    var el = e.target.closest('[data-preview-image]');
+                    if (!el) return;
+                    img.src = el.dataset.previewImage;
+                    overlay.style.display = 'block';
+                });
+                document.addEventListener('mousemove', function(e) {
+                    overlay.style.left = (e.clientX + 20) + 'px';
+                    overlay.style.top  = (e.clientY - 20) + 'px';
+                });
+                document.addEventListener('mouseout', function(e) {
+                    if (!e.target.closest('[data-preview-image]')) return;
+                    overlay.style.display = 'none';
+                });
+            })();
 
             // Dom Ready Events
-            $(document).ready(function() {
-                // dataTable init
-                var $table = $('#main-table'),
-                    tableLng = $table.find('th').length,
-                    _targets = (tableLng && tableLng == 7) ? [0, 4, 5, 6] : tableLng == 5 ? [0, 4] : [3];
-                mainTable = $('#main-table').DataTable({
-                    paging: false,
-                    info: false,
-                    order: [],
-                    columnDefs: [{
-                        targets: _targets,
-                        orderable: false
-                    }]
-                });
+            document.addEventListener('DOMContentLoaded', function() {
+                // DataTable init
+                var table = document.getElementById('main-table');
+                if (table) {
+                    var tableLng = table.querySelectorAll('th').length;
+                    var _targets = (tableLng === 7) ? [0, 4, 5, 6] : (tableLng === 5) ? [0, 4] : [3];
+                    mainTable = new DataTable('#main-table', {
+                        paging: false,
+                        info: false,
+                        order: [],
+                        columnDefs: [{ targets: _targets, orderable: false }]
+                    });
+                }
 
-                // filter table
-                $('#search-addon').on('keyup', function() {
+                // Filter table
+                var searchAddon = document.getElementById('search-addon');
+                if (searchAddon) searchAddon.addEventListener('keyup', function() {
                     mainTable.search(this.value).draw();
                 });
 
-                $("input#advanced-search").on('keyup', function(e) {
-                    if (e.keyCode === 13) {
-                        fm_search();
-                    }
+                var advSearch = document.querySelector('input#advanced-search');
+                if (advSearch) advSearch.addEventListener('keyup', function(e) {
+                    if (e.key === 'Enter') fm_search();
                 });
 
-                $('#search-addon3').on('click', function() {
-                    fm_search();
-                });
+                var searchBtn = document.getElementById('search-addon3');
+                if (searchBtn) searchBtn.addEventListener('click', fm_search);
 
-                //upload nav tabs
-                $(".fm-upload-wrapper .card-header-tabs").on("click", 'a', function(e) {
+                // Upload nav tabs
+                var uploadTabs = document.querySelector('.fm-upload-wrapper .card-header-tabs');
+                if (uploadTabs) uploadTabs.addEventListener('click', function(e) {
+                    var a = e.target.closest('a');
+                    if (!a) return;
                     e.preventDefault();
-                    let target = $(this).data('target');
-                    $(".fm-upload-wrapper .card-header-tabs a").removeClass('active');
-                    $(this).addClass('active');
-                    $(".fm-upload-wrapper .card-tabs-container").addClass('hidden');
-                    $(target).removeClass('hidden');
+                    var target = a.dataset.target;
+                    uploadTabs.querySelectorAll('a').forEach(function(el) { el.classList.remove('active'); });
+                    a.classList.add('active');
+                    document.querySelectorAll('.fm-upload-wrapper .card-tabs-container').forEach(function(el) { el.classList.add('hidden'); });
+                    var targetEl = document.querySelector(target);
+                    if (targetEl) targetEl.classList.remove('hidden');
                 });
             });
         </script>
@@ -6305,15 +6216,13 @@ function fm_show_header_login()
                 <?php endif; ?>
 
                 function renderThemeMode() {
-                    var $modeEl = $("select#js-ace-mode"),
-                        $themeEl = $("select#js-ace-theme"),
-                        $fontSizeEl = $("select#js-ace-fontSize"),
+                    var modeEl = document.querySelector('select#js-ace-mode'),
+                        themeEl = document.querySelector('select#js-ace-theme'),
+                        fontSizeEl = document.querySelector('select#js-ace-fontSize'),
                         optionNode = function(type, arr) {
-                            var $Option = "";
-                            $.each(arr, function(i, val) {
-                                $Option += "<option value='" + type + i + "'>" + val + "</option>";
-                            });
-                            return $Option;
+                            return Object.entries(arr).map(function(kv) {
+                                return '<option value="' + type + kv[0] + '">' + kv[1] + '</option>';
+                            }).join('');
                         },
                         _data = {
                             "aceTheme": {
@@ -6538,50 +6447,51 @@ function fm_show_header_login()
                     }
                     if (_data && _data.aceTheme) {
                         var lightTheme = optionNode("ace/theme/", _data.aceTheme.bright),
-                            darkTheme = optionNode("ace/theme/", _data.aceTheme.dark);
-                        $themeEl.html("<optgroup label=\"Bright\">" + lightTheme + "</optgroup><optgroup label=\"Dark\">" + darkTheme + "</optgroup>");
+                            darkTheme = optionNode('ace/theme/', _data.aceTheme.dark);
+                        themeEl.innerHTML = '<optgroup label="Bright">' + lightTheme + '</optgroup><optgroup label="Dark">' + darkTheme + '</optgroup>';
                     }
                     if (_data && _data.fontSize) {
-                        $fontSizeEl.html(optionNode("", _data.fontSize));
+                        fontSizeEl.innerHTML = optionNode('', _data.fontSize);
                     }
-                    $modeEl.val(editor.getSession().$modeId);
-                    $themeEl.val(editor.getTheme());
-                    $(function() {
-                        //set default font size in drop down
-                        $fontSizeEl.val(<?php echo (int)FM_ACE_FONT_SIZE; ?>).change();
-                    });
+                    modeEl.value = editor.getSession().$modeId;
+                    themeEl.value = editor.getTheme();
+                    // set default font size in drop down
+                    fontSizeEl.value = <?php echo (int)FM_ACE_FONT_SIZE; ?>;
+                    fontSizeEl.dispatchEvent(new Event('change'));
                 }
 
-                $(function() {
+                document.addEventListener('DOMContentLoaded', function() {
                     renderThemeMode();
-                    $(".js-ace-toolbar").on("click", 'button', function(e) {
+                    var toolbar = document.querySelector('.js-ace-toolbar');
+                    if (toolbar) toolbar.addEventListener('click', function(e) {
+                        var btn = e.target.closest('button');
+                        if (!btn) return;
                         e.preventDefault();
-                        let cmdValue = $(this).attr("data-cmd"),
-                            editorOption = $(this).attr("data-option");
-                        if (cmdValue && cmdValue != "none") {
+                        var cmdValue = btn.getAttribute('data-cmd');
+                        var editorOption = btn.getAttribute('data-option');
+                        if (cmdValue && cmdValue !== 'none') {
                             ace_commend(cmdValue);
-                        } else if (editorOption) {
-                            if (editorOption == "fullscreen") {
-                                (void 0 !== document.fullScreenElement && null === document.fullScreenElement || void 0 !== document.msFullscreenElement && null === document.msFullscreenElement || void 0 !== document.mozFullScreen && !document.mozFullScreen || void 0 !== document.webkitIsFullScreen && !document.webkitIsFullScreen) &&
-                                (editor.container.requestFullScreen ? editor.container.requestFullScreen() : editor.container.mozRequestFullScreen ? editor.container.mozRequestFullScreen() : editor.container.webkitRequestFullScreen ? editor.container.webkitRequestFullScreen(Element.ALLOW_KEYBOARD_INPUT) : editor.container.msRequestFullscreen && editor.container.msRequestFullscreen());
-                            } else if (editorOption == "wrap") {
-                                let wrapStatus = (editor.getSession().getUseWrapMode()) ? false : true;
-                                editor.getSession().setUseWrapMode(wrapStatus);
-                            }
+                        } else if (editorOption === 'fullscreen') {
+                            (void 0 !== document.fullScreenElement && null === document.fullScreenElement || void 0 !== document.msFullscreenElement && null === document.msFullscreenElement || void 0 !== document.mozFullScreen && !document.mozFullScreen || void 0 !== document.webkitIsFullScreen && !document.webkitIsFullScreen) &&
+                            (editor.container.requestFullScreen ? editor.container.requestFullScreen() : editor.container.mozRequestFullScreen ? editor.container.mozRequestFullScreen() : editor.container.webkitRequestFullScreen ? editor.container.webkitRequestFullScreen(Element.ALLOW_KEYBOARD_INPUT) : editor.container.msRequestFullscreen && editor.container.msRequestFullscreen());
+                        } else if (editorOption === 'wrap') {
+                            editor.getSession().setUseWrapMode(!editor.getSession().getUseWrapMode());
                         }
                     });
 
-                    $("select#js-ace-mode, select#js-ace-theme, select#js-ace-fontSize").on("change", function(e) {
-                        e.preventDefault();
-                        let selectedValue = $(this).val(),
-                            selectionType = $(this).attr("data-type");
-                        if (selectedValue && selectionType == "mode") {
-                            editor.getSession().setMode(selectedValue);
-                        } else if (selectedValue && selectionType == "theme") {
-                            editor.setTheme(selectedValue);
-                        } else if (selectedValue && selectionType == "fontSize") {
-                            editor.setFontSize(parseInt(selectedValue));
-                        }
+                    document.querySelectorAll('select#js-ace-mode, select#js-ace-theme, select#js-ace-fontSize').forEach(function(sel) {
+                        sel.addEventListener('change', function(e) {
+                            e.preventDefault();
+                            var selectedValue = this.value;
+                            var selectionType = this.getAttribute('data-type');
+                            if (selectedValue && selectionType === 'mode') {
+                                editor.getSession().setMode(selectedValue);
+                            } else if (selectedValue && selectionType === 'theme') {
+                                editor.setTheme(selectedValue);
+                            } else if (selectedValue && selectionType === 'fontSize') {
+                                editor.setFontSize(parseInt(selectedValue));
+                            }
+                        });
                     });
                 });
             </script>

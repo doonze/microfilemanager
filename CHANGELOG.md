@@ -10,6 +10,23 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [3.4] - Unreleased
 
+### Changed
+- **Removed jQuery dependency entirely** — all `$.ajax()` calls replaced with a central
+  `mfmFetch()` helper using native `fetch()`. All `$()` DOM selectors replaced with
+  `document.getElementById` / `querySelector`. Bootstrap modal calls converted to
+  `bootstrap.Modal.getOrCreateInstance()`. One less CDN request per page load.
+- **Upgraded DataTables 1.13.1 → 2.x standalone** — DataTables 2.x has no jQuery
+  dependency. Init converted from `$('#id').DataTable({})` to `new DataTable('#id', {})`.
+  DataTables CSS remains inline; only the JS CDN tag changed.
+- **Replaced `previewImage` jQuery plugin with vanilla JS** — 30-line jQuery plugin
+  factory removed. Replaced with a 20-line vanilla JS overlay that uses `closest()`,
+  `dataset`, and `fixed` positioning. Cursor-following behavior preserved.
+- **Converted ACE editor toolbar/select wiring to vanilla JS** — `$(function(){})`,
+  `$(this).attr()`, and `.on('change')` jQuery patterns replaced with `addEventListener`
+  and `getAttribute()`.
+- **Global jQuery ajaxError handler removed** — 401 session-expired handling now built
+  into `mfmFetch()` and fires on every request automatically.
+
 ### Removed
 - **Dead `savedata` form-POST save path (JS + PHP)** — The JS else-branch that built and
   submitted a `<form>` with a `savedata` textarea was permanently unreachable (guarded by
