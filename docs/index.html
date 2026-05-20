@@ -143,13 +143,32 @@ wget https://github.com/doonze/microfilemanager/releases/latest/download/microfi
 
     <!-- Tools -->
     <section class="py-5">
-        <div class="container text-center">
-            <h2 class="h4 fw-bold mb-4">Tools</h2>
-            <a href="pwd.html" class="card text-decoration-none d-inline-block p-4 shadow-sm" style="max-width:320px;">
-                <div class="h1 mb-2"><i class="fa fa-key text-warning"></i></div>
-                <h5 class="fw-bold mb-1">Password Hash Generator</h5>
-                <p class="text-body-secondary small mb-0">Generate a PHP bcrypt hash for your MFM users — runs entirely in your browser.</p>
-            </a>
+        <div class="container">
+            <h2 class="h4 fw-bold text-center mb-2">Tools</h2>
+            <p class="text-center text-body-secondary mb-4">Need to generate a password hash for a user? Two ways to do it:</p>
+            <div class="row justify-content-center g-4">
+                <div class="col-md-5">
+                    <div class="card h-100 shadow-sm text-center p-4">
+                        <div class="h1 mb-2"><i class="fa fa-cog text-secondary"></i></div>
+                        <h5 class="fw-bold mb-2">From inside MFM</h5>
+                        <p class="text-body-secondary small mb-0">
+                            Already logged in? Go to <strong>Settings</strong> and click
+                            <strong>Password Hash Generator</strong> in the sidebar — it opens the tool in a new tab.
+                            Or use the built-in quick generator right there on the settings page.
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <a href="pwd.html" class="card h-100 shadow-sm text-center p-4 text-decoration-none d-block">
+                        <div class="h1 mb-2"><i class="fa fa-key text-warning"></i></div>
+                        <h5 class="fw-bold mb-2">Hosted Tool</h5>
+                        <p class="text-body-secondary small mb-0">
+                            Use the standalone password hash generator directly — no login required.
+                            Runs entirely in your browser, nothing is sent to any server.
+                        </p>
+                    </a>
+                </div>
+            </div>
         </div>
     </section>
 </main>
