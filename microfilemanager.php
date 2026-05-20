@@ -2398,11 +2398,12 @@ if (isset($_GET['help'])) {
                     <div class="col-xs-12 col-sm-6">
                         <div class="card">
                             <ul class="list-group list-group-flush">
-                                <li class="list-group-item"><a href="https://github.com/prasathmani/tinyfilemanager/wiki" target="_blank"><i class="fa fa-question-circle"></i> <?php echo lng('Help Documents') ?> </a> </li>
-                                <li class="list-group-item"><a href="https://github.com/prasathmani/tinyfilemanager/issues" target="_blank"><i class="fa fa-bug"></i> <?php echo lng('Report Issue') ?></a></li>
+                                <li class="list-group-item"><a href="https://github.com/doonze/microfilemanager" target="_blank"><i class="fa fa-question-circle"></i> <?php echo lng('Help Documents') ?> </a> </li>
+                                <li class="list-group-item"><a href="https://github.com/doonze/microfilemanager/issues" target="_blank"><i class="fa fa-bug"></i> <?php echo lng('Report Issue') ?></a></li>
                                 <?php if (!FM_READONLY) { ?>
                                     <li class="list-group-item"><a href="javascript:show_new_pwd();"><i class="fa fa-lock"></i> <?php echo lng('Generate new password hash') ?></a></li>
                                 <?php } ?>
+                                <li class="list-group-item"><a href="https://doonze.github.io/microfilemanager/pwd.html" target="_blank"><i class="fa fa-key"></i> <?php echo lng('Password Hash Generator') ?></a></li>
                             </ul>
                         </div>
                     </div>
@@ -6752,6 +6753,7 @@ function fm_show_header_login()
         $tr['en']['Error while deleting items'] = 'Error while deleting items';
         $tr['en']['Moved from']         = 'Moved from';
         $tr['en']['Generate new password hash'] = 'Generate new password hash';
+$tr['en']['Password Hash Generator']    = 'Password Hash Generator (opens in new tab)';
         $tr['en']['Login failed. Invalid username or password'] = 'Login failed. Invalid username or password';
         $tr['en']['password_hash not supported, Upgrade PHP version'] = 'password_hash not supported, Upgrade PHP version';
         $tr['en']['Advanced Search']    = 'Advanced Search';
