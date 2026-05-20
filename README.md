@@ -31,8 +31,6 @@ These are the improvements MFM adds on top of the upstream TFM codebase:
 
 ## Demo
 
-*(Coming soon)*
-
 [![Micro File Manager](screenshot.gif)](screenshot.gif)
 
 ## Requirements
