@@ -12,7 +12,7 @@ $CONFIG = '{"lang":"en","error_reporting":true,"show_hidden":false,"hide_Cols":f
  * H3K ~ Tiny File Manager V2.6
  * @author CCP Programmers
  * @github https://github.com/prasathmani/tinyfilemanager
- * @link https://tinyfilemanager.github.io
+ * @link https://doonze.github.io/microfilemanager/
  */
 
 //MFM version
@@ -40,7 +40,7 @@ $login_lockout_minutes = 15;  // lockout duration in minutes
 
 // Login user name and password
 // Users: array('Username' => 'Password', 'Username2' => 'Password2', ...)
-// Generate secure password hash - https://tinyfilemanager.github.io/docs/pwd.html
+// Generate secure password hash - https://doonze.github.io/microfilemanager/pwd.html
 // Users, readonly list, and per-user paths are managed in config.php.
 // Define them here only as fallback empty arrays — config.php values are merged
 // in below, with any entries defined HERE winning on conflict.

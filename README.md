@@ -1,6 +1,6 @@
 # Micro File Manager (MFM)
 
-[![Live demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg?style=flat-square)](https://github.com/doonze/microfilemanager)
+[![Live demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg?style=flat-square)](https://doonze.github.io/microfilemanager/)
 [![GitHub Release](https://img.shields.io/github/release/doonze/microfilemanager.svg?style=flat-square)](https://github.com/doonze/microfilemanager/releases)
 [![GitHub License](https://img.shields.io/github/license/doonze/microfilemanager.svg?style=flat-square)](https://github.com/doonze/microfilemanager/blob/master/LICENSE)
 
