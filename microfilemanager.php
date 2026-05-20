@@ -1901,7 +1901,7 @@ if (isset($_GET['upload']) && !FM_READONLY) {
     <?php print_external('js-dropzone'); ?>
 
     <!-- Upload conflict resolution modal -->
-    <div class="modal fade" id="uploadConflictModal" tabindex="-1" aria-labelledby="uploadConflictLabel" aria-hidden="true" data-bs-theme="<?php echo FM_THEME; ?>">
+    <div class="modal fade" id="uploadConflictModal" tabindex="-1" aria-labelledby="uploadConflictLabel" data-bs-theme="<?php echo FM_THEME; ?>">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -5540,7 +5540,7 @@ function fm_show_header_login()
     <body class="<?php echo (FM_THEME == "dark") ? 'theme-dark' : ''; ?> <?php echo $isStickyNavBar; ?>">
         <div id="wrapper" class="container-fluid">
             <!-- New Item creation -->
-            <div class="modal fade" id="createNewItem" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="newItemModalLabel" aria-hidden="true" data-bs-theme="<?php echo FM_THEME; ?>">
+            <div class="modal fade" id="createNewItem" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="newItemModalLabel" data-bs-theme="<?php echo FM_THEME; ?>">
                 <div class="modal-dialog" role="document">
                     <form class="modal-content" method="post">
                         <div class="modal-header">
@@ -5572,7 +5572,7 @@ function fm_show_header_login()
 
             <!-- Advance Search Modal -->
             <!-- Privilege Elevation Modal -->
-<div class="modal fade" id="mfm-elevate-modal" tabindex="-1" aria-labelledby="mfmElevateLabel" aria-hidden="true" data-bs-theme="<?php echo FM_THEME; ?>" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="mfm-elevate-modal" tabindex="-1" aria-labelledby="mfmElevateLabel" data-bs-theme="<?php echo FM_THEME; ?>" data-bs-backdrop="static" data-bs-keyboard="false">
 <div class="modal-dialog" role="document">
 <div class="modal-content">
 <div class="modal-header bg-warning bg-opacity-25">
@@ -5601,7 +5601,7 @@ function fm_show_header_login()
 </div>
 </div>
 
-<div class="modal fade" id="searchModal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true" data-bs-theme="<?php echo FM_THEME; ?>">
+<div class="modal fade" id="searchModal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" data-bs-theme="<?php echo FM_THEME; ?>">
                 <div class="modal-dialog modal-lg" role="document">
                     <div class="modal-content">
                         <div class="modal-header">
