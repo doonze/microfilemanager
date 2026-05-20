@@ -16,7 +16,7 @@ $CONFIG = '{"lang":"en","error_reporting":true,"show_hidden":false,"hide_Cols":f
  */
 
 //MFM version
-define('VERSION', '3.3');
+define('VERSION', '3.4');
 
 //Application Title
 define('APP_TITLE', 'Micro File Manager');
