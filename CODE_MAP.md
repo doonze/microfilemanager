@@ -1,23 +1,28 @@
 # MFM Code Map — microfilemanager.php
 
-**File size:** ~291KB / 6,786 lines  
-**Last mapped:** 2026-05-20 (v3.4 dev)
+**File size:** ~282KB / 6,728 lines  
+**Last mapped:** 2026-05-20 (v3.4 dev)  
+**Previous size:** ~291KB / 6,786 lines — reduced by ~2.7KB / 58 lines in dead-code cleanup
 
 ---
 
 ## 🚨 Known Issues (Fix Before Next Release)
 
-| # | Severity | Line(s) | Issue |
+| # | Severity | Location | Issue |
 |---|----------|---------|-------|
-| 1 | 🔴 Security | 2691 | `$_POST['savedata']` handler has **no CSRF token check** |
-| 2 | 🟠 Dead code | 5823 | `if (true)` wrapper in JS save path — else branch is unreachable |
-| 3 | 🟠 Dead code | 5865 | JS else branch builds a `savedata` form that can never be submitted |
-| 4 | 🟠 Dead code | 2691–2713 | PHP `savedata` handler is only reachable via the dead JS branch |
-| 5 | 🟠 Dead code | 958–1007 | `$use_curl = false` hardcoded — entire curl upload branch never runs |
-| 6 | 🟡 Bug | 5876+5980 | `show_new_pwd()` defined **twice** inside `fm_show_footer()` |
-| 7 | 🟡 Quality | 4558 | `$path2 = $path ? $path : '.'` assigned inline inside an HTML attribute |
-| 8 | 🟡 Quality | 3496 | `fm_get_size()` checks `ini_get('safe_mode')` — removed in PHP 7.0 |
-| 9 | 🟡 Quality | 6129 | `confirmDailog` is a persistent typo (should be `confirmDialog`) — in function name, CSS class, and HTML |
+| 1 | 🟡 Quality | `fm_show_nav_path()` | `$path2` assigned inline inside an HTML href attribute — confusing but not a bug |
+| 2 | 🟡 Quality | `fm_show_footer()` JS ~line 6129 | `confirmDailog` is a persistent typo (should be `confirmDialog`) — consistent throughout HTML + JS so safe to leave |
+
+### ✅ Fixed in v3.4 Cleanup (2026-05-20)
+
+| # | Was | Fixed |
+|---|-----|-------|
+| 1 | 🔴 `$_POST['savedata']` — no CSRF token, dead code path | Removed entire handler |
+| 2 | 🟠 JS `if (true)` wrapper + dead else branch | Removed, save path is now a clean direct AJAX call |
+| 3 | 🟠 `$use_curl = false` + unreachable curl upload branch (~20 lines) | Removed, stream_context branch is now the only path |
+| 4 | 🟡 `show_new_pwd()` defined twice in `fm_show_footer()` | Removed first (orphaned) definition |
+| 5 | 🟡 Duplicate `show_hidden` check in settings AJAX handler | Removed copy-paste duplicate |
+| 6 | 🟡 `ini_get('safe_mode')` in `fm_get_size()` — always true on PHP 7+ | Removed obsolete condition |
 
 ---
 

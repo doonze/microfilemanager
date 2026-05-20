@@ -899,10 +899,6 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
             $cfg->data['show_hidden'] = $shf;
             $show_hidden_files = $shf;
         }
-        if ($cfg->data['show_hidden'] != $shf) {
-            $cfg->data['show_hidden'] = $shf;
-            $show_hidden_files = $shf;
-        }
         if ($cfg->data['hide_Cols'] != $hco) {
             $cfg->data['hide_Cols'] = $hco;
             $hide_Cols = $hco;
@@ -955,7 +951,6 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
             exit();
         }
 
-        $use_curl = false;
         $temp_file = tempnam(sys_get_temp_dir(), "upload-");
         $fileinfo = new stdClass();
         $fileinfo->name = trim(urldecode(basename($url)), ".\x00..\x20");
@@ -974,21 +969,6 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
 
         if (!$url) {
             $success = false;
-        } else if ($use_curl) {
-            @$fp = fopen($temp_file, "w");
-            @$ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_NOPROGRESS, false);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_FILE, $fp);
-            @$success = curl_exec($ch);
-            $curl_info = curl_getinfo($ch);
-            if (!$success) {
-                $err = array("message" => curl_error($ch));
-            }
-            @curl_close($ch);
-            fclose($fp);
-            $fileinfo->size = $curl_info["size_download"];
-            $fileinfo->type = $curl_info["content_type"];
         } else {
             $ctx = stream_context_create();
             @$success = copy($url, $temp_file, $ctx);
@@ -2687,27 +2667,6 @@ if (isset($_GET['edit']) && !FM_READONLY) {
         }
     }
 
-    // Save File
-    if (isset($_POST['savedata'])) {
-        $writedata = $_POST['savedata'];
-        if (!is_writable($file_path)) {
-            fm_set_msg(lng('File is not writable. Check permissions.'), 'error');
-        } else {
-            $fd = fopen($file_path, "w");
-            if ($fd === false) {
-                fm_set_msg(lng('Could not open file for writing.'), 'error');
-            } else {
-                $write_result = fwrite($fd, $writedata);
-                fclose($fd);
-                if ($write_result === false) {
-                    fm_set_msg(lng('File could not be saved. Check permissions.'), 'error');
-                } else {
-                    fm_set_msg(lng('File Saved Successfully'));
-                }
-            }
-        }
-    }
-
     $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
     $mime_type = fm_get_mime_type($file_path);
     $filesize = filesize($file_path);
@@ -3503,7 +3462,7 @@ function fm_get_size($file)
     if ($iswin === null) {
         $iswin = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
         $isdarwin = strtoupper(PHP_OS) === 'DARWIN';
-        $exec_works = function_exists('exec') && !ini_get('safe_mode') && @exec('echo EXEC') === 'EXEC';
+        $exec_works = function_exists('exec') && @exec('echo EXEC') === 'EXEC';
     }
 
     // Attempt shell command if exec is available
@@ -5820,61 +5779,44 @@ function fm_show_header_login()
                     }
 
                     // ─ Normal save path ─────────────────────────────────
-                    if (true) {
-                        var data = {
-                            ajax: true,
-                            content: n,
-                            type: 'save',
-                            token: window.csrf
-                        };
+                    var data = {
+                        ajax: true,
+                        content: n,
+                        type: 'save',
+                        token: window.csrf
+                    };
 
-                        $.ajax({
-                            type: "POST",
-                            url: window.location,
-                            data: JSON.stringify(data),
-                            contentType: "application/json; charset=utf-8",
-                            success: function(mes) {
-                                toast("Saved Successfully");
-                                window.onbeforeunload = function() {
-                                    return
-                                }
-                            },
-                            error: function(mes) {
-                                // 401 session_expired — global ajaxError handler
-                                // will reload to login page; suppress toast here
-                                if (mes.status === 401) {
-                                    try {
-                                        var r = JSON.parse(mes.responseText);
-                                        if (r.error === 'session_expired') return;
-                                    } catch(e) {}
-                                }
-                                var msg = "Save failed";
-                                try {
-                                    var json = JSON.parse(mes.responseText);
-                                    if (json.error) msg = json.error;
-                                } catch(e) {
-                                    if (mes.responseText) msg = mes.responseText;
-                                }
-                                toast('<span style="color:#ff6b6b"><i class="fa fa-exclamation-triangle"></i> ' + msg + '</span>');
+                    $.ajax({
+                        type: "POST",
+                        url: window.location,
+                        data: JSON.stringify(data),
+                        contentType: "application/json; charset=utf-8",
+                        success: function(mes) {
+                            toast("Saved Successfully");
+                            window.onbeforeunload = function() {
+                                return
                             }
-                        });
-                    } else {
-                        var a = document.createElement("form");
-                        a.setAttribute("method", "POST"), a.setAttribute("action", "");
-                        var o = document.createElement("textarea");
-                        o.setAttribute("type", "textarea"), o.setAttribute("name", "savedata");
-                        let cx = document.createElement("input");
-                        cx.setAttribute("type", "hidden");
-                        cx.setAttribute("name", "token");
-                        cx.setAttribute("value", window.csrf);
-                        var c = document.createTextNode(n);
-                        o.appendChild(c), a.appendChild(o), a.appendChild(cx), document.body.appendChild(a), a.submit()
-                    }
+                        },
+                        error: function(mes) {
+                            // 401 session_expired — global ajaxError handler
+                            // will reload to login page; suppress toast here
+                            if (mes.status === 401) {
+                                try {
+                                    var r = JSON.parse(mes.responseText);
+                                    if (r.error === 'session_expired') return;
+                                } catch(e) {}
+                            }
+                            var msg = "Save failed";
+                            try {
+                                var json = JSON.parse(mes.responseText);
+                                if (json.error) msg = json.error;
+                            } catch(e) {
+                                if (mes.responseText) msg = mes.responseText;
+                            }
+                            toast('<span style="color:#ff6b6b"><i class="fa fa-exclamation-triangle"></i> ' + msg + '</span>');
+                        }
+                    });
                 }
-            }
-
-            function show_new_pwd() {
-                $(".js-new-pwd").toggleClass('hidden');
             }
 
             // ────────────────────────────────────────────────────────────────

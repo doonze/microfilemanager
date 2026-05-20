@@ -10,6 +10,24 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [3.4] - Unreleased
 
+### Removed
+- **Dead `savedata` form-POST save path (JS + PHP)** — The JS else-branch that built and
+  submitted a `<form>` with a `savedata` textarea was permanently unreachable (guarded by
+  `if (true)`). Its corresponding PHP handler had no CSRF token check. Both removed.
+- **`if (true)` wrapper** in the normal editor save path — pointless conditional stripped;
+  the AJAX save call is now direct.
+- **Dead cURL upload branch** — `$use_curl` was hardcoded to `false`, making the entire
+  `curl_init` / `curl_exec` block (~20 lines) permanently unreachable. Removed; only the
+  `stream_context_create()` / `copy()` path remains.
+
+### Fixed
+- **Duplicate `show_hidden` check** in the settings AJAX handler — identical `if` block
+  was copy-pasted directly below itself with no effect. Second occurrence removed.
+- **Duplicate `show_new_pwd()` function** — defined twice inside `fm_show_footer()`. The
+  first (orphaned) definition removed; the second is the canonical one.
+- **Obsolete `safe_mode` check** in `fm_get_size()` — `ini_get('safe_mode')` always
+  returns falsy on PHP 7.0+. Removed from exec availability check.
+
 ---
 
 ## [3.3] - 2026-05-20
