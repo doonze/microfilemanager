@@ -141,7 +141,7 @@ To generate a password hash:
 php -r "echo password_hash('yourpassword', PASSWORD_DEFAULT);"
 ```
 
-Or use the online tool: [https://tinyfilemanager.github.io/docs/pwd.html](https://tinyfilemanager.github.io/docs/pwd.html)
+Or use the online tool: [https://doonze.github.io/microfilemanager/pwd.html](https://doonze.github.io/microfilemanager/pwd.html)
 
 To enable/disable authentication set `$use_auth` to true or false.
 
