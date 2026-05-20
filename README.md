@@ -46,8 +46,8 @@ If the daemon is not running, MFM behaves exactly as before. There is no UI chan
 2. If the daemon is running and the file is not writable by `www-data`, an **⚡ Elevate** button appears next to the disabled Save button.
 3. Click Elevate → enter your Linux username and password in the modal.
 4. Click **Verify Access** — the daemon checks your credentials via PAM and confirms you either:
-   - Are a member of the `sudo` group, **or**
-   - Own the file with the owner-write bit set
+   - **Own the file** with the owner-write bit set — you can write that specific file
+   - **Are a member of the `sudo` group** — you can write any non-blocked file on the system
 5. If approved, the editor unlocks. The Save button becomes **Save (Elevated)**.
 6. Every save re-authenticates with the daemon — no cached credentials, no session tokens.
 
