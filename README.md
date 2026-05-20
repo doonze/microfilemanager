@@ -1,6 +1,6 @@
 # Micro File Manager (MFM)
 
-[![Live demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg?style=flat-square)](https://github.com/doonze/microfilemanager)
+[![Live demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg?style=flat-square)](https://doonze.github.io/microfilemanager/)
 [![GitHub Release](https://img.shields.io/github/release/doonze/microfilemanager.svg?style=flat-square)](https://github.com/doonze/microfilemanager/releases)
 [![GitHub License](https://img.shields.io/github/license/doonze/microfilemanager.svg?style=flat-square)](https://github.com/doonze/microfilemanager/blob/master/LICENSE)
 
@@ -28,10 +28,70 @@ These are the improvements MFM adds on top of the upstream TFM codebase:
 | **Write-permission awareness** | TFM used `@fwrite` — errors were silently swallowed with zero feedback. MFM removes the suppressor and properly checks `is_writable()`, `fopen()`, and `fwrite()` at each step. Read-only files show a **Read Only** badge; the Save button is disabled; Ctrl+S is unbound. Save errors surface as specific messages (e.g., *"File is not writable. Check permissions/ownership."*) rather than TFM's generic "try again". HTTP 403 is returned server-side before any write is attempted. |
 | **Permission denied on move** | When a move operation fails, MFM checks whether the source directory, destination directory, or destination file is the culprit and appends **(Permission denied)** to the error. TFM returned a generic move-failed message with no indication of why. |
 | **Full config coverage** | Every configurable setting in the main file is documented and overridable in `config.php`. See `config.example.php`. |
+| **Brute-force login protection** | Failed login attempts are tracked per IP (hashed, never stored raw). After `$login_max_attempts` (default 5) consecutive failures the IP is locked out for `$login_lockout_minutes` (default 15 minutes). Lockout expires automatically; counter clears on successful login. Both values are configurable in `config.php`. |
+| **Security headers** | Sent on every response: `X-Frame-Options: SAMEORIGIN` (anti-clickjacking), `X-Content-Type-Options: nosniff` (anti-MIME-sniff), `Referrer-Policy: strict-origin-when-cross-origin`, `X-XSS-Protection: 1; mode=block`. `X-Powered-By` header is stripped to avoid leaking the PHP version. |
+| **Privilege Elevation** | Optionally edit root-owned system files (e.g. `/etc/hostname`, Apache/Nginx configs) without granting `www-data` any sudo access. Requires the companion `mfm-elevate` Python daemon. See the [Privilege Elevation](#-privilege-elevation-optional) section below for details. |
+
+## ⚡ Privilege Elevation (Optional)
+
+MFM includes an optional privilege elevation system that lets you edit files that `www-data` cannot write — root-owned system configs, service files, and similar — without granting `www-data` any `sudo` access and without switching to a different tool.
+
+It works via a small companion Python daemon (`mfm-elevate`) that runs as root, listens on a Unix socket, and handles authenticated write requests. MFM's PHP communicates with it entirely server-side — credentials never leave the server and never touch the browser's storage.
+
+If the daemon is not running, MFM behaves exactly as before. There is no UI change, no error, and no configuration required on the PHP side.
+
+### How it works
+
+1. On every editor page load MFM silently pings the daemon socket. If it doesn't respond, nothing changes.
+2. If the daemon is running and the file is not writable by `www-data`, an **⚡ Elevate** button appears next to the disabled Save button.
+3. Click Elevate → enter your Linux username and password in the modal.
+4. Click **Verify Access** — the daemon checks your credentials via PAM and confirms you either:
+   - **Own the file** with the owner-write bit set — you can write that specific file
+   - **Are a member of the `sudo` group** — you can write any non-blocked file on the system
+5. If approved, the editor unlocks. The Save button becomes **Save (Elevated)**.
+6. Every save re-authenticates with the daemon — no cached credentials, no session tokens.
+
+### Requirements
+
+- **Python 3** — already installed on most Linux servers.
+- **python3-pam** — PAM bindings for Python:
+  ```bash
+  sudo apt install python3-pam
+  ```
+
+### Setup
+
+See [`elevate/INSTALL.md`](elevate/INSTALL.md) for full instructions. Quick version:
+
+```bash
+# Copy daemon to server
+sudo mkdir -p /opt/mfm-elevate
+sudo cp elevate/mfm-elevate.py /opt/mfm-elevate/
+sudo chmod 750 /opt/mfm-elevate/mfm-elevate.py
+sudo chown root:root /opt/mfm-elevate/mfm-elevate.py
+
+# Create log file
+sudo touch /var/log/mfm-elevate.log
+sudo chmod 640 /var/log/mfm-elevate.log
+
+# Install and start systemd service
+sudo cp elevate/mfm-elevate.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now mfm-elevate
+```
+
+### Security model
+
+- **`root` is always blocked** as a username — no exceptions.
+- **Sensitive paths are blocked** at both the PHP and daemon level: `/etc/sudoers`, `/etc/sudoers.d`, `/etc/shadow`, `/etc/gshadow`, `/etc/passwd`, `/etc/group`, `/etc/ssh`, `/root`, `/proc`, `/sys`.
+- **Credentials in memory only** — never written to `localStorage`, cookies, or the log. Cleared on page navigation.
+- **Every write re-authenticates** — the check result is never trusted in isolation.
+- **Atomic writes** — daemon uses temp file + rename to prevent partial writes on failure.
+- **Socket access controlled** — socket is `root:www-data 0660`; only the web server process can connect.
+
+---
 
 ## Demo
-
-*(Coming soon)*
 
 [![Micro File Manager](screenshot.gif)](screenshot.gif)
 
@@ -39,6 +99,10 @@ These are the improvements MFM adds on top of the upstream TFM codebase:
 
 - PHP 5.5.0 or higher.
 - Fileinfo, iconv, zip, tar and mbstring extensions are strongly recommended.
+- **Optional (Privilege Elevation only):** Python 3.6 or later and the `python3-pam` module:
+  ```bash
+  sudo apt install python3-pam
+  ```
 
 ## How to use
 
@@ -77,7 +141,7 @@ To generate a password hash:
 php -r "echo password_hash('yourpassword', PASSWORD_DEFAULT);"
 ```
 
-Or use the online tool: [https://tinyfilemanager.github.io/docs/pwd.html](https://tinyfilemanager.github.io/docs/pwd.html)
+Or use the online tool: [https://doonze.github.io/microfilemanager/pwd.html](https://doonze.github.io/microfilemanager/pwd.html)
 
 To enable/disable authentication set `$use_auth` to true or false.
 

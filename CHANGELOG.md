@@ -8,7 +8,43 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [3.3] - Unreleased
+## [3.4] - Unreleased
+
+---
+
+## [3.3] - 2026-05-20
+
+### Added
+- **Privilege Elevation (Elevate feature)** — allows editing files that `www-data` cannot
+  write (e.g. root-owned system files) without granting `www-data` any sudo permissions.
+  Requires the companion `mfm-elevate` Python daemon running on the server (see
+  `elevate/INSTALL.md`). Full feature set:
+  - **Auto-detection** — MFM pings the daemon socket on every editor page load. If the
+    daemon is not running, everything behaves exactly as before — no Elevate button appears.
+  - **⚡ Elevate button** — appears alongside the disabled Save button on read-only files,
+    but only when the daemon is detected. Opens a credential modal.
+  - **Two-factor gate** — to elevate you must know BOTH the MFM password AND a Linux system
+    username/password that authenticates via PAM and has sudo group membership.
+  - **Pre-flight access check** — credentials and sudo membership are verified BEFORE
+    the editor unlocks, so you can't spend time editing a file you can't actually save.
+  - **Editor locked until elevated** — textarea and ACE editor are set to read-only
+    when a file is not writable. Elevation unlocks the editor and enables Ctrl+S.
+  - **Save (Elevated)** — after elevation succeeds, the Save button becomes a red
+    "Save (Elevated)" button. Re-authenticates with the daemon on every save.
+  - **root blocked** — the daemon refuses `root` as a username unconditionally.
+  - **Blocked paths** — `/etc/sudoers`, `/etc/sudoers.d/`, `/etc/shadow`, `/etc/gshadow`
+    and others are blocked from both viewing and editing in MFM, independent of the daemon.
+    Configured via `$elevate_view_blocked` in `config.php`. Daemon enforces its own list too.
+  - **Atomic writes** — daemon uses temp-file + rename for safe privileged writes.
+  - **Credentials in memory only** — never persisted to localStorage or cookies.
+    Cleared on page navigation.
+  - **Daemon files** in new `elevate/` directory: `mfm-elevate.py`, `mfm-elevate.service`,
+    `INSTALL.md`.
+
+### Fixed
+- **`/` as root path now works** — `rtrim($root_path, '\\/')` stripped the sole `/` to
+  an empty string, causing a false "Root path not found" error for any user whose root
+  was set to the filesystem root. Empty result is now restored to `'/'`.
 
 ---
 

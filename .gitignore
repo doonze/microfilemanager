@@ -12,6 +12,9 @@ config.php.tmp
 # Local project context — contains personal paths and deployment notes.
 PROJECT_CONTEXT.md
 
+# Wiki repo — cloned separately, has its own .git
+wiki/
+
 # OS noise
 .DS_Store
 Thumbs.db

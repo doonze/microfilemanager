@@ -1,0 +1,30 @@
+[Unit]
+Description=MicroFileManager Privilege Elevation Daemon
+Documentation=https://github.com/doonze/microfilemanager
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/mfm-elevate/mfm-elevate.py
+Restart=on-failure
+RestartSec=5
+
+# Must run as root so it can write privileged files
+User=root
+Group=root
+
+# Runtime socket directory — 0755 so www-data can traverse into it.
+# The socket itself is root:www-data 0660, so only www-data can connect.
+RuntimeDirectory=mfm-elevate
+RuntimeDirectoryMode=0755
+
+# Harden the service where possible
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

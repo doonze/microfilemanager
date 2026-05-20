@@ -19,6 +19,8 @@
 // MERGED with any users in microfilemanager.php — main file wins on conflict.
 // An empty array here is safe; it just adds no extra users.
 // Generate a hash: php -r "echo password_hash('yourpassword', PASSWORD_DEFAULT);"
+// Or use the online tool: https://doonze.github.io/microfilemanager/pwd.html
+// Or in MFM: Settings → Password Hash Generator
 $auth_users = array(
     // 'admin'     => '$2y$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
     // 'user2'     => '$2y$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
