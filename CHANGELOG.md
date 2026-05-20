@@ -8,7 +8,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [3.3] - Unreleased
+## [3.4] - Unreleased
+
+---
+
+## [3.3] - 2026-05-20
 
 ### Added
 - **Privilege Elevation (Elevate feature)** — allows editing files that `www-data` cannot
