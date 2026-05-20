@@ -99,6 +99,10 @@ sudo systemctl enable --now mfm-elevate
 
 - PHP 5.5.0 or higher.
 - Fileinfo, iconv, zip, tar and mbstring extensions are strongly recommended.
+- **Optional (Privilege Elevation only):** Python 3.6 or later and the `python3-pam` module:
+  ```bash
+  sudo apt install python3-pam
+  ```
 
 ## How to use
 
