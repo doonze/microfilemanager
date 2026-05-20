@@ -229,7 +229,7 @@ $external = array(
     'js-ace' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.js"></script>',
     'js-bootstrap' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>',
     'js-dropzone' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.js"></script>',
-    'js-datatables' => '<script src="https://cdn.datatables.net/2.1.8/js/dataTables.min.js" crossorigin="anonymous" defer></script>',
+
     'js-highlightjs' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>',
     'pre-jsdelivr' => '',  // jsdelivr replaced by cdnjs — preconnect no longer needed
     'pre-cloudflare' => '<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin/><link rel="dns-prefetch" href="https://cdnjs.cloudflare.com"/>'
@@ -5207,23 +5207,19 @@ function fm_show_header_login()
 
             table.dataTable thead .sorting {
                 cursor: pointer;
-                background-repeat: no-repeat;
-                background-position: center right;
-                background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABMAAAATCAQAAADYWf5HAAAAkElEQVQoz7XQMQ5AQBCF4dWQSJxC5wwax1Cq1e7BAdxD5SL+Tq/QCM1oNiJidwox0355mXnG/DrEtIQ6azioNZQxI0ykPhTQIwhCR+BmBYtlK7kLJYwWCcJA9M4qdrZrd8pPjZWPtOqdRQy320YSV17OatFC4euts6z39GYMKRPCTKY9UnPQ6P+GtMRfGtPnBCiqhAeJPmkqAAAAAElFTkSuQmCC');
             }
-
-            table.dataTable thead .sorting_asc {
-                cursor: pointer;
-                background-repeat: no-repeat;
-                background-position: center right;
-                background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABMAAAATCAYAAAByUDbMAAAAZ0lEQVQ4y2NgGLKgquEuFxBPAGI2ahhWCsS/gDibUoO0gPgxEP8H4ttArEyuQYxAPBdqEAxPBImTY5gjEL9DM+wTENuQahAvEO9DMwiGdwAxOymGJQLxTyD+jgWDxCMZRsEoGAVoAADeemwtPcZI2wAAAABJRU5ErkJggg==');
+            table.dataTable thead .sorting::after {
+                content: ' \21C5';
+                opacity: 0.4;
+                font-size: 0.8em;
             }
-
-            table.dataTable thead .sorting_desc {
-                cursor: pointer;
-                background-repeat: no-repeat;
-                background-position: center right;
-                background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABMAAAATCAYAAAByUDbMAAAAZUlEQVQ4y2NgGAWjYBSggaqGu5FA/BOIv2PBIPFEUgxjB+IdQPwfC94HxLykus4GiD+hGfQOiB3J8SojEE9EM2wuSJzcsFMG4ttQgx4DsRalkZENxL+AuJQaMcsGxBOAmGvopk8AVz1sLZgg0bsAAAAASUVORK5CYII=');
+            table.dataTable thead .sorting_asc::after {
+                content: ' \2191';
+                opacity: 1;
+            }
+            table.dataTable thead .sorting_desc::after {
+                content: ' \2193';
+                opacity: 1;
             }
 
             table.dataTable thead tr:first-child th.custom-checkbox-header:first-child {
@@ -5682,7 +5678,6 @@ function fm_show_header_login()
         ?>
         </div>
         <?php print_external('js-bootstrap'); ?>
-        <?php print_external('js-datatables'); ?>
         <?php if (FM_USE_HIGHLIGHTJS && isset($_GET['view'])): ?>
             <?php print_external('js-highlightjs'); ?>
             <script>
@@ -6023,19 +6018,82 @@ function fm_show_header_login()
                 });
             })();
 
+            // ── Vanilla table sort + filter (replaces DataTables) ───────────────────
+            var mainTable = (function() {
+                var _tbody, _rows, _sortCol = -1, _sortDir = 1, _filter = '';
+
+                // Parse a cell value for smart sorting (sizes, dates, text)
+                function parseVal(cell) {
+                    var t = (cell.dataset.order || cell.textContent).trim();
+                    // File size: convert "1.5 MB" etc. to bytes
+                    var sizeM = t.match(/^([\d.]+)\s*(B|KB|MB|GB|TB)$/i);
+                    if (sizeM) {
+                        var units = { b:1, kb:1024, mb:1048576, gb:1073741824, tb:1099511627776 };
+                        return parseFloat(sizeM[1]) * (units[sizeM[2].toLowerCase()] || 1);
+                    }
+                    var n = parseFloat(t);
+                    return isNaN(n) ? t.toLowerCase() : n;
+                }
+
+                function applySort() {
+                    if (_sortCol < 0 || !_tbody) return;
+                    var rows = Array.from(_tbody.querySelectorAll('tr:not(.d-none):not([style*="display: none"])'));
+                    rows.sort(function(a, b) {
+                        var ca = a.cells[_sortCol], cb = b.cells[_sortCol];
+                        if (!ca || !cb) return 0;
+                        var va = parseVal(ca), vb = parseVal(cb);
+                        if (va < vb) return -1 * _sortDir;
+                        if (va > vb) return  1 * _sortDir;
+                        return 0;
+                    });
+                    rows.forEach(function(r) { _tbody.appendChild(r); });
+                }
+
+                function applyFilter() {
+                    if (!_tbody) return;
+                    var q = _filter.toLowerCase();
+                    Array.from(_tbody.rows).forEach(function(r) {
+                        var text = Array.from(r.cells).map(function(c) { return c.textContent; }).join(' ').toLowerCase();
+                        r.style.display = (!q || text.indexOf(q) !== -1) ? '' : 'none';
+                    });
+                }
+
+                function init(tableId, noSortCols) {
+                    var table = document.getElementById(tableId);
+                    if (!table) return;
+                    _tbody = table.tBodies[0];
+                    _rows  = Array.from(_tbody ? _tbody.rows : []);
+                    var ths = table.querySelectorAll('thead th');
+                    ths.forEach(function(th, i) {
+                        if (noSortCols.indexOf(i) !== -1) return;
+                        th.classList.add('sorting');
+                        th.style.cursor = 'pointer';
+                        th.addEventListener('click', function() {
+                            if (_sortCol === i) { _sortDir *= -1; }
+                            else { _sortCol = i; _sortDir = 1; }
+                            ths.forEach(function(t) { t.classList.remove('sorting_asc','sorting_desc'); t.classList.add('sorting'); });
+                            th.classList.remove('sorting');
+                            th.classList.add(_sortDir === 1 ? 'sorting_asc' : 'sorting_desc');
+                            applySort();
+                        });
+                    });
+                }
+
+                return {
+                    init: init,
+                    search: function(q) { _filter = q; applyFilter(); return this; },
+                    draw:   function()  { return this; }  // compat shim
+                };
+            })();
+
             // Dom Ready Events
             document.addEventListener('DOMContentLoaded', function() {
-                // DataTable init
+                // Table init — match the same non-sortable column logic as before
                 var table = document.getElementById('main-table');
                 if (table) {
-                    var tableLng = table.querySelectorAll('th').length;
-                    var _targets = (tableLng === 7) ? [0, 4, 5, 6] : (tableLng === 5) ? [0, 4] : [3];
-                    mainTable = new DataTable('#main-table', {
-                        paging: false,
-                        info: false,
-                        order: [],
-                        columnDefs: [{ targets: _targets, orderable: false }]
-                    });
+                    var cols = table.querySelectorAll('th').length;
+                    var noSort = (cols === 7) ? [0, 4, 5, 6] : (cols === 5) ? [0, 4] : [3];
+                    mainTable.init('main-table', noSort);
                 }
 
                 // Filter table

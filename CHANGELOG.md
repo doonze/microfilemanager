@@ -15,9 +15,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `mfmFetch()` helper using native `fetch()`. All `$()` DOM selectors replaced with
   `document.getElementById` / `querySelector`. Bootstrap modal calls converted to
   `bootstrap.Modal.getOrCreateInstance()`. One less CDN request per page load.
-- **Upgraded DataTables 1.13.1 → 2.x standalone** — DataTables 2.x has no jQuery
-  dependency. Init converted from `$('#id').DataTable({})` to `new DataTable('#id', {})`.
-  DataTables CSS remains inline; only the JS CDN tag changed.
+- **Removed DataTables entirely** — replaced with ~60 lines of vanilla JS sort + filter.
+  Supports smart value parsing (file sizes, numbers, text), per-column sort direction
+  toggle, Unicode sort arrows via CSS `::after`, and live row filtering. Zero CDN
+  dependency. Column sort CSS updated from base64 PNG sprites to clean pseudo-elements.
 - **Replaced `previewImage` jQuery plugin with vanilla JS** — 30-line jQuery plugin
   factory removed. Replaced with a 20-line vanilla JS overlay that uses `closest()`,
   `dataset`, and `fixed` positioning. Cursor-following behavior preserved.
