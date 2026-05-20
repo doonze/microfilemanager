@@ -36,7 +36,7 @@ These are the improvements MFM adds on top of the upstream TFM codebase:
 
 MFM includes an optional privilege elevation system that lets you edit files that `www-data` cannot write — root-owned system configs, service files, and similar — without granting `www-data` any `sudo` access and without switching to a different tool.
 
-It works via a small companion daemon (`mfm-elevate`) that runs as root, listens on a Unix socket, and handles authenticated write requests. MFM's PHP communicates with it entirely server-side — credentials never leave the server and never touch the browser's storage.
+It works via a small companion Python daemon (`mfm-elevate`) that runs as root, listens on a Unix socket, and handles authenticated write requests. MFM's PHP communicates with it entirely server-side — credentials never leave the server and never touch the browser's storage.
 
 If the daemon is not running, MFM behaves exactly as before. There is no UI change, no error, and no configuration required on the PHP side.
 
