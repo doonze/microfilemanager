@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 //Default Configuration
 $CONFIG = '{"lang":"en","error_reporting":true,"show_hidden":false,"hide_Cols":false,"theme":"dark"}';
 
@@ -10,8 +10,8 @@ $CONFIG = '{"lang":"en","error_reporting":true,"show_hidden":false,"hide_Cols":f
  * Forked from Tiny File Manager — https://github.com/prasathmani/tinyfilemanager
  *
  * H3K ~ Tiny File Manager V2.6
- * @author CCP Programmers
- * @github https://github.com/prasathmani/tinyfilemanager
+ * @author Justin Hopper
+ * @github https://github.com/doonze/microfilemanager
  * @link https://doonze.github.io/microfilemanager/
  */
 
@@ -2392,8 +2392,8 @@ if (isset($_GET['help'])) {
                         <p>
                         <h3><a href="https://github.com/doonze/microfilemanager" target="_blank" class="app-v-title"> Micro File Manager <?php echo VERSION; ?></a></h3>
                         </p>
-                        <p>Author: PRAŚATH MANİ</p>
-                        <p>Mail Us: <a href="mailto:ccpprogrammers@gmail.com">ccpprogrammers [at] gmail [dot] com</a> </p>
+                        <p>Author: Justin Hopper</p>
+                        <p>Mail Us: <a href="mailto:doonze@doonze.net">doonze [at] doonze [dot] net</a></p>
                     </div>
                     <div class="col-xs-12 col-sm-6">
                         <div class="card">
