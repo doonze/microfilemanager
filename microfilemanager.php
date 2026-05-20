@@ -2106,6 +2106,9 @@ if (isset($_GET['upload']) && !FM_READONLY) {
                         var bulkAction = (action === 'rename') ? 'autonumber' : action;
                         bulkResolve(bulkAction, modal);
                     } else {
+                        // Blur before hide — prevents aria-hidden warning when Bootstrap
+                        // sets aria-hidden on the modal while a button still has focus
+                        if (document.activeElement) document.activeElement.blur();
                         modal.hide();
                         // hidden.bs.modal listener fires: conflictBusy=false → processConflictQueue()
                     }
@@ -2122,6 +2125,7 @@ if (isset($_GET['upload']) && !FM_READONLY) {
         function bulkResolve(action, modal) {
             var remaining = conflictQueue.slice();
             conflictQueue = [];
+            if (document.activeElement) document.activeElement.blur();
             modal.hide();
 
             function resolveNext(items) {
