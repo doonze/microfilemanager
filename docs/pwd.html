@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Password hash generator for Micro File Manager — bcrypt hashes generated entirely in your browser. No server, no data sent anywhere.">
+    <meta name="robots" content="noindex, nofollow">
+    <title>MFM · Password Hash Generator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" crossorigin="anonymous">
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        main { flex: 1; }
+
+        #hash-output {
+            font-family: monospace;
+            font-size: 0.85rem;
+            letter-spacing: 0.02em;
+            resize: none;
+        }
+
+        .code-block {
+            background: var(--bs-tertiary-bg);
+            border-radius: 6px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+            border: 1px solid var(--bs-border-color);
+            white-space: pre;
+            overflow-x: auto;
+        }
+
+        .copy-btn { min-width: 110px; }
+
+        footer a { text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar border-bottom">
+    <div class="container">
+        <a class="navbar-brand fw-bold" href="https://github.com/doonze/microfilemanager" target="_blank">
+            <i class="fa fa-folder-open text-warning me-1"></i>
+            Micro File Manager
+            <span class="badge bg-secondary ms-1" style="font-size:0.65rem;vertical-align:middle;">MFM</span>
+        </a>
+        <button class="btn btn-sm btn-outline-secondary" id="theme-toggle" title="Toggle light/dark mode">
+            <i class="fa fa-moon-o" id="theme-icon"></i>
+        </button>
+    </div>
+</nav>
+
+<!-- Main -->
+<main class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-7 col-md-9">
+
+            <!-- Header -->
+            <div class="text-center mb-4">
+                <h1 class="h3 fw-bold mb-2">
+                    <i class="fa fa-key text-warning me-2"></i>Password Hash Generator
+                </h1>
+                <p class="text-body-secondary mb-1">
+                    Generates a PHP <code>password_hash()</code>-compatible bcrypt hash.
+                </p>
+                <p class="small text-success mb-0">
+                    <i class="fa fa-lock me-1"></i>Runs entirely in your browser &mdash; your password is never sent anywhere.
+                </p>
+            </div>
+
+            <!-- Generator card -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header fw-semibold">
+                    <i class="fa fa-cog me-2"></i>Generate Hash
+                </div>
+                <div class="card-body">
+
+                    <!-- Password input -->
+                    <div class="mb-3">
+                        <label for="pwd-input" class="form-label">Password</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control font-monospace" id="pwd-input"
+                                placeholder="Enter your password" autocomplete="off" spellcheck="false">
+                            <button class="btn btn-outline-secondary" id="show-pwd" type="button" title="Show / hide password">
+                                <i class="fa fa-eye" id="show-pwd-icon"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary" id="random-pwd" type="button" title="Generate a random password">
+                                <i class="fa fa-refresh me-1"></i>Random
+                            </button>
+                        </div>
+                        <div class="form-text" id="pwd-strength-text">&nbsp;</div>
+                    </div>
+
+                    <!-- Generate button -->
+                    <div class="d-grid mb-3">
+                        <button class="btn btn-success btn-lg" id="generate-btn" type="button">
+                            <span id="btn-label"><i class="fa fa-bolt me-1"></i>Generate Hash</span>
+                            <span id="btn-spinner" class="d-none">
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                Generating&hellip;
+                            </span>
+                        </button>
+                    </div>
+
+                    <!-- Hash output -->
+                    <div class="mb-2">
+                        <label for="hash-output" class="form-label">Password Hash</label>
+                        <textarea class="form-control" id="hash-output" rows="3" readonly
+                            placeholder="Your hash will appear here&hellip;"></textarea>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-primary btn-sm copy-btn" id="copy-btn" type="button" disabled>
+                            <i class="fa fa-clipboard me-1"></i>Copy Hash
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" id="clear-btn" type="button">
+                            <i class="fa fa-times me-1"></i>Clear
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- How to use card -->
+            <div class="card shadow-sm">
+                <div class="card-header fw-semibold">
+                    <i class="fa fa-info-circle me-2"></i>How to Use
+                </div>
+                <div class="card-body">
+
+                    <p class="mb-2">Paste the generated hash into your <code>config.php</code> or directly in <code>microfilemanager.php</code>:</p>
+                    <div class="code-block mb-3">$auth_users = array(
+    'yourusername' => 'PASTE_HASH_HERE',
+);</div>
+
+                    <hr>
+
+                    <p class="mb-2">Prefer the command line? Generate a hash directly on your server:</p>
+                    <div class="code-block mb-3">php -r "echo password_hash('yourpassword', PASSWORD_DEFAULT);"</div>
+
+                    <hr>
+
+                    <p class="small text-body-secondary mb-0">
+                        <i class="fa fa-shield me-1"></i>
+                        Hashes use <strong>bcrypt</strong> with cost factor <strong>10</strong> &mdash; the same default PHP uses for
+                        <code>PASSWORD_DEFAULT</code>. Verified with <code>password_verify()</code>. Non-reversible.
+                    </p>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</main>
+
+<!-- Footer -->
+<footer class="border-top py-3 text-center text-body-secondary small">
+    &mdash;&mdash; &copy; <a href="https://github.com/doonze/microfilemanager" class="text-body-secondary" target="_blank">Micro File Manager</a> &mdash;&mdash;
+</footer>
+
+<!-- bcryptjs — all hashing done client-side, nothing leaves your browser -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bcryptjs/2.4.3/bcrypt.min.js" crossorigin="anonymous"></script>
+<script>
+(function () {
+    'use strict';
+
+    // ── Theme toggle ──────────────────────────────────────────────────────────
+    const html      = document.documentElement;
+    const themeBtn  = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
+    let dark = true;
+
+    themeBtn.addEventListener('click', function () {
+        dark = !dark;
+        html.setAttribute('data-bs-theme', dark ? 'dark' : 'light');
+        themeIcon.className = dark ? 'fa fa-moon-o' : 'fa fa-sun-o';
+    });
+
+    // ── Show / hide password ──────────────────────────────────────────────────
+    const pwdInput    = document.getElementById('pwd-input');
+    const showPwdBtn  = document.getElementById('show-pwd');
+    const showPwdIcon = document.getElementById('show-pwd-icon');
+
+    showPwdBtn.addEventListener('click', function () {
+        var show = pwdInput.type === 'password';
+        pwdInput.type = show ? 'text' : 'password';
+        showPwdIcon.className = show ? 'fa fa-eye-slash' : 'fa fa-eye';
+    });
+
+    // ── Random password generator ─────────────────────────────────────────────
+    var randomBtn = document.getElementById('random-pwd');
+
+    function randomPassword(len) {
+        var alpha   = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+        var digits  = '23456789';
+        var special = '!@#$%^&*+-_';
+        var all     = alpha + digits + special;
+        var pwd     = '';
+        // Guarantee at least one of each type
+        pwd += alpha  [Math.floor(Math.random() * alpha.length)];
+        pwd += digits [Math.floor(Math.random() * digits.length)];
+        pwd += special[Math.floor(Math.random() * special.length)];
+        for (var i = 3; i < len; i++) {
+            pwd += all[Math.floor(Math.random() * all.length)];
+        }
+        // Shuffle so the guaranteed chars aren't always at the front
+        return pwd.split('').sort(function () { return Math.random() - 0.5; }).join('');
+    }
+
+    randomBtn.addEventListener('click', function () {
+        pwdInput.type         = 'text';
+        showPwdIcon.className = 'fa fa-eye-slash';
+        pwdInput.value        = randomPassword(14);
+        pwdInput.dispatchEvent(new Event('input'));
+    });
+
+    // ── Password strength ─────────────────────────────────────────────────────
+    var strengthText = document.getElementById('pwd-strength-text');
+
+    pwdInput.addEventListener('input', function () {
+        var v = pwdInput.value;
+        if (!v) { strengthText.textContent = '\u00a0'; strengthText.className = 'form-text'; return; }
+        var score = 0;
+        if (v.length >= 8)               score++;
+        if (v.length >= 12)              score++;
+        if (/[A-Z]/.test(v))             score++;
+        if (/[0-9]/.test(v))             score++;
+        if (/[^A-Za-z0-9]/.test(v))      score++;
+        var levels = ['', 'Very weak', 'Weak', 'Fair', 'Strong', 'Very strong'];
+        var colors = ['', 'text-danger', 'text-warning', 'text-info', 'text-primary', 'text-success'];
+        strengthText.className   = 'form-text ' + (colors[score] || '');
+        strengthText.textContent = levels[score] ? 'Strength: ' + levels[score] : '\u00a0';
+    });
+
+    // ── Hash generation ───────────────────────────────────────────────────────
+    var generateBtn = document.getElementById('generate-btn');
+    var btnLabel    = document.getElementById('btn-label');
+    var btnSpinner  = document.getElementById('btn-spinner');
+    var hashOutput  = document.getElementById('hash-output');
+    var copyBtn     = document.getElementById('copy-btn');
+    var clearBtn    = document.getElementById('clear-btn');
+
+    generateBtn.addEventListener('click', function () {
+        var pwd = pwdInput.value.trim();
+        if (!pwd) {
+            pwdInput.classList.add('is-invalid');
+            setTimeout(function () { pwdInput.classList.remove('is-invalid'); }, 1500);
+            pwdInput.focus();
+            return;
+        }
+
+        generateBtn.disabled = true;
+        btnLabel.classList.add('d-none');
+        btnSpinner.classList.remove('d-none');
+        hashOutput.value = '';
+        copyBtn.disabled = true;
+
+        // Cost factor 10 — matches PHP PASSWORD_DEFAULT
+        dcodeIO.bcrypt.hash(pwd, 10, null, function (err, hash) {
+            generateBtn.disabled = false;
+            btnLabel.classList.remove('d-none');
+            btnSpinner.classList.add('d-none');
+
+            if (err || !hash) {
+                hashOutput.value = 'Error generating hash — please try again.';
+                return;
+            }
+
+            // Replace $2b$ with $2y$ for full PHP compatibility across all versions
+            hash = hash.replace(/^\$2b\$/, '$2y$');
+            hashOutput.value = hash;
+            copyBtn.disabled = false;
+            hashOutput.select();
+        });
+    });
+
+    // ── Copy to clipboard ─────────────────────────────────────────────────────
+    copyBtn.addEventListener('click', function () {
+        var hash = hashOutput.value;
+        if (!hash) return;
+
+        var originalHtml = copyBtn.innerHTML;
+
+        function onCopied() {
+            copyBtn.innerHTML = '<i class="fa fa-check me-1"></i>Copied!';
+            copyBtn.classList.remove('btn-outline-primary');
+            copyBtn.classList.add('btn-success');
+            setTimeout(function () {
+                copyBtn.innerHTML = originalHtml;
+                copyBtn.classList.remove('btn-success');
+                copyBtn.classList.add('btn-outline-primary');
+            }, 2000);
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(hash).then(onCopied);
+        } else {
+            hashOutput.select();
+            document.execCommand('copy');
+            onCopied();
+        }
+    });
+
+    // ── Clear ─────────────────────────────────────────────────────────────────
+    clearBtn.addEventListener('click', function () {
+        pwdInput.value   = '';
+        hashOutput.value = '';
+        copyBtn.disabled = true;
+        strengthText.textContent = '\u00a0';
+        strengthText.className   = 'form-text';
+        pwdInput.focus();
+    });
+
+    // ── Enter key triggers generate ───────────────────────────────────────────
+    pwdInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') generateBtn.click();
+    });
+
+}());
+</script>
+</body>
+</html>
