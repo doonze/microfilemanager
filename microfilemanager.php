@@ -2744,6 +2744,8 @@ if (isset($_GET['view'])) {
 
 // file editor
 if (isset($_GET['edit']) && !FM_READONLY) {
+    $file = $_GET['edit'];
+    $file = fm_clean_path($file, false);
     $file = str_replace('/', '', $file);
     if ($file == '' || !is_file($path . '/' . $file) || !fm_is_exclude_items($file, $path . '/' . $file)) {
         fm_set_msg(lng('File not found'), 'error');
