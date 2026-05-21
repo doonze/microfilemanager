@@ -1039,7 +1039,7 @@ if (isset($_GET['raw']) && (isset($_SESSION[FM_SESSION_ID]['logged'], $auth_user
     $raw_file = str_replace('/', '', fm_clean_path($_GET['raw']));
     $raw_path = $path . '/' . $raw_file;
     $raw_ext  = strtolower(pathinfo($raw_file, PATHINFO_EXTENSION));
-    $raw_allowed = ['gif','jpg','jpeg','png','bmp','ico','svg','webp','avif','mp3','ogg','wav','flac','mp4','webm','ogv','mov'];
+    $raw_allowed = ['gif','jpg','jpeg','png','bmp','ico','svg','webp','avif','mp3','ogg','wav','flac','mp4','webm','ogv','mov','mkv','avi','m4v','wmv','flv','m4a','opus','weba'];
 
     if ($raw_file && in_array($raw_ext, $raw_allowed) && is_file($raw_path) && is_readable($raw_path)) {
         // Discard any buffered output (HTML, warnings, session data) before
