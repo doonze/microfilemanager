@@ -2734,9 +2734,6 @@ if (isset($_GET['view'])) {
     echo 'window.mfmFileReadable='    . $fr . ';';
     echo 'window.mfmElevateMode="view";';
     echo 'window.mfmElevateState={active:false,username:"",password:""};';
-    if (!$file_readable && $elevate_available) {
-        echo 'document.addEventListener("DOMContentLoaded",function(){mfmShowElevateModal();});';
-    }
     echo '</script>';
     fm_show_footer();
     exit;
