@@ -2507,6 +2507,18 @@ if (isset($_GET['view'])) {
     $file_path = $path . '/' . $file;
     $file_writable  = is_writable($file_path);
     $file_readable  = is_readable($file_path);
+    $elevate_available = !$file_readable ? fm_elevate_available($elevate_socket) : false;
+
+    // Owner / permissions for display
+    $file_stat  = @stat($file_path);
+    $file_owner = '-';
+    $file_group = '-';
+    $file_perms = '-';
+    if ($file_stat) {
+        $file_owner = function_exists('posix_getpwuid') ? (posix_getpwuid($file_stat['uid'])['name'] ?? $file_stat['uid']) : $file_stat['uid'];
+        $file_group = function_exists('posix_getgrgid') ? (posix_getgrgid($file_stat['gid'])['name'] ?? $file_stat['gid']) : $file_stat['gid'];
+        $file_perms = substr(sprintf('%o', $file_stat['mode']), -4);
+    }
 
     $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
     $mime_type = fm_get_mime_type($file_path);  // returns '--' if unreadable — no warning
@@ -2544,6 +2556,9 @@ if (isset($_GET['view'])) {
     } elseif ($file_readable && (in_array($ext, fm_get_text_exts()) || substr($mime_type, 0, 4) == 'text' || in_array($mime_type, fm_get_text_mimes()))) {
         $is_text = true;
         $content = file_get_contents($file_path);
+    } elseif (!$file_readable && in_array($ext, fm_get_text_exts())) {
+        // File looks like text by extension but www-data can't read it — offer elevation
+        $is_text = true;
     }
 
 ?>
@@ -2556,6 +2571,7 @@ if (isset($_GET['view'])) {
                 <li class="list-group-item"><strong><?php echo lng('Date Modified') ?>:</strong> <?php echo date(FM_DATETIME_FORMAT, filemtime($file_path)); ?></li>
                 <li class="list-group-item"><strong><?php echo lng('File size') ?>:</strong> <?php echo ($filesize_raw <= 1000) ? "$filesize_raw bytes" : $filesize; ?></li>
                 <li class="list-group-item"><strong><?php echo lng('MIME-type') ?>:</strong> <?php echo $mime_type ?></li>
+                <li class="list-group-item"><strong>Permissions:</strong> <?php echo $file_perms ?> &nbsp; <strong>Owner:</strong> <?php echo fm_enc($file_owner) ?> : <?php echo fm_enc($file_group) ?></li>
                 <?php
                 // ZIP info
                 if (($is_zip || $is_gzip) && $filenames !== false) {
@@ -2669,7 +2685,18 @@ if (isset($_GET['view'])) {
                 } elseif ($is_video) {
                     echo '<div class="preview-video"><video src="' . fm_enc($raw_url) . '" width="640" height="360" controls preload="metadata"></video></div>';
                 } elseif ($is_text) {
-                    if (FM_USE_HIGHLIGHTJS) {
+                    if (!$file_readable) {
+                        // File exists but www-data can't read it
+                        if ($elevate_available) {
+                            echo '<div id="mfm-view-elevated-content" class="mt-2" style="display:none"><pre id="mfm-view-pre"></pre></div>';
+                            echo '<div id="mfm-view-locked" class="alert alert-warning mt-3">';
+                            echo '<i class="fa fa-lock"></i> <strong>Permission denied</strong> — this file is not readable by the web server.<br>';
+                            echo '<button class="btn btn-warning btn-sm mt-2" onclick="mfmShowElevateModal()"><i class="fa fa-bolt"></i> ⚡ Elevate to View</button>';
+                            echo '</div>';
+                        } else {
+                            echo '<div class="alert alert-danger mt-3"><i class="fa fa-lock"></i> <strong>Permission denied</strong> — this file is not readable by the web server and no elevation daemon is available.</div>';
+                        }
+                    } elseif (FM_USE_HIGHLIGHTJS) {
                         // highlight
                         $hljs_classes = array(
                             'shtml' => 'xml',
@@ -2696,12 +2723,21 @@ if (isset($_GET['view'])) {
         </div>
     </div>
 <?php
+    // Inject elevation state for view page
+    $ea = $elevate_available ? 'true' : 'false';
+    $fr = $file_readable    ? 'true' : 'false';
+    echo '<script>';
+    echo 'window.mfmElevateAvailable=' . $ea . ';';
+    echo 'window.mfmFileReadable='    . $fr . ';';
+    echo 'window.mfmElevateMode="view";';
+    echo 'window.mfmElevateState={active:false,username:"",password:""};';
+    if (!$file_readable && $elevate_available) {
+        echo 'document.addEventListener("DOMContentLoaded",function(){mfmShowElevateModal();});';
+    }
+    echo '</script>';
     fm_show_footer();
     exit;
 }
-
-// file editor
-if (isset($_GET['edit']) && !FM_READONLY) {
     $file = $_GET['edit'];
     $file = fm_clean_path($file, false);
     $file = str_replace('/', '', $file);
@@ -5893,14 +5929,17 @@ function fm_show_header_login()
                 document.getElementById('mfm-elevate-pass').value = '';
                 var msg = document.getElementById('mfm-elevate-msg');
                 msg.classList.remove('text-danger', 'text-success');
-                // Tell the user WHY they're elevating
                 if (!window.mfmFileReadable) {
-                    msg.textContent = '⚠️ This file is not readable by the web server. Authenticate to load and edit it.';
+                    var action = (window.mfmElevateMode === 'view') ? 'view' : 'edit';
+                    msg.textContent = '⚠️ This file is not readable by the web server. Authenticate to load and ' + action + ' it.';
                     msg.classList.add('text-danger');
                 } else {
                     msg.textContent = '';
                 }
                 document.getElementById('mfm-elevate-begin').style.display = 'none';
+                // Label button for view vs edit context
+                var beginBtn = document.getElementById('mfm-elevate-begin');
+                beginBtn.textContent = (window.mfmElevateMode === 'view') ? 'Begin Viewing' : 'Begin Editing';
                 var btn = document.getElementById('mfm-elevate-check-btn');
                 btn.disabled = false;
                 btn.textContent = 'Verify Access';
@@ -5987,7 +6026,6 @@ function fm_show_header_login()
                 }
 
                 if (!window.mfmFileReadable) {
-                    // File wasn't readable — do an elevated read to get content first
                     mfmFetch({
                         ajax: true, token: window.csrf, type: 'elevate_read',
                         username: window.mfmElevateState.username,
@@ -5995,7 +6033,19 @@ function fm_show_header_login()
                     }).then(function(res) {
                         if (res && res.ok) {
                             window.mfmFileReadable = true;
-                            _unlockEditor(res.content);
+                            if (window.mfmElevateMode === 'view') {
+                                // View page — just show content in a pre block
+                                bootstrap.Modal.getOrCreateInstance(document.getElementById('mfm-elevate-modal')).hide();
+                                var locked = document.getElementById('mfm-view-locked');
+                                var elevated = document.getElementById('mfm-view-elevated-content');
+                                var pre = document.getElementById('mfm-view-pre');
+                                if (locked) locked.style.display = 'none';
+                                if (pre) pre.textContent = res.content;
+                                if (elevated) elevated.style.display = '';
+                                toast('⚡ Content loaded via elevation.');
+                            } else {
+                                _unlockEditor(res.content);
+                            }
                         } else {
                             var msg = document.getElementById('mfm-elevate-msg');
                             msg.textContent = '❌ ' + ((res && res.error) ? res.error : 'Read failed.');
