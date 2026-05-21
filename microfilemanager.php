@@ -1037,7 +1037,7 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
 // ── Raw image serve (for hover preview when files are outside web root) ─────────────
 // Requires valid session or no-auth mode. No token needed — read-only, images only.
 if (isset($_GET['raw']) && (isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_ID]['logged']]) || !FM_USE_AUTH)) {
-    $path = FM_ROOT_PATH;
+    $path = rtrim(FM_ROOT_PATH, '/');
     if (FM_PATH != '') $path .= '/' . FM_PATH;
     $raw_file = str_replace('/', '', fm_clean_path($_GET['raw']));
     $raw_path = $path . '/' . $raw_file;
