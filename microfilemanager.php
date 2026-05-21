@@ -848,7 +848,47 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
         }
         die(json_encode($r));
     }
-    if (isset($_POST['type']) && $_POST['type'] == "backup" && !empty($_POST['file'])) {
+
+    // ── Elevation: privileged read ──────────────────────────────────────────────────
+    if (isset($_POST['type']) && $_POST['type'] === 'elevate_read') {
+        global $elevate_socket, $elevate_view_blocked;
+        header('Content-Type: application/json');
+        header('X-XSS-Protection:0');
+
+        $path = FM_ROOT_PATH;
+        if (FM_PATH != '') $path .= '/' . FM_PATH;
+        $file = fm_clean_path($_GET['edit'] ?? '', false);
+        $file = str_replace('/', '', $file);
+        $file_path = $path . '/' . $file;
+
+        if (!$file || !is_file($file_path)) {
+            header('HTTP/1.1 404 Not Found');
+            die(json_encode(['ok' => false, 'error' => 'File not found.']));
+        }
+        if (fm_path_is_blocked($file_path, $elevate_view_blocked)) {
+            header('HTTP/1.1 403 Forbidden');
+            die(json_encode(['ok' => false, 'error' => 'That file is restricted.']));
+        }
+
+        $username = trim($_POST['username'] ?? '');
+        $password = $_POST['password'] ?? '';
+        if (!$username || !$password) {
+            header('HTTP/1.1 400 Bad Request');
+            die(json_encode(['ok' => false, 'error' => 'Credentials required.']));
+        }
+
+        $r = fm_elevate_send($elevate_socket, [
+            'action'   => 'read',
+            'username' => $username,
+            'password' => $password,
+            'filepath' => realpath($file_path) ?: $file_path,
+        ]);
+        if ($r === null) {
+            header('HTTP/1.1 503 Service Unavailable');
+            die(json_encode(['ok' => false, 'error' => 'Could not reach elevation daemon.']));
+        }
+        die(json_encode($r));
+    }
         $fileName = fm_clean_path($_POST['file']);
         $fullPath = FM_ROOT_PATH . '/';
         if (!empty($_POST['path'])) {
@@ -2439,10 +2479,11 @@ if (isset($_GET['view'])) {
 
     $file_url = FM_ROOT_URL . fm_convert_win((FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $file);
     $file_path = $path . '/' . $file;
-    $file_writable = is_writable($file_path); // used by buttons, keyboard shortcuts, and save handler
+    $file_writable  = is_writable($file_path);
+    $file_readable  = is_readable($file_path);
 
     $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
-    $mime_type = fm_get_mime_type($file_path);
+    $mime_type = fm_get_mime_type($file_path);  // returns '--' if unreadable — no warning
     $filesize_raw = fm_get_size($file_path);
     $filesize = fm_get_filesize($filesize_raw);
 
@@ -2474,7 +2515,7 @@ if (isset($_GET['view'])) {
     } elseif (in_array($ext, fm_get_video_exts())) {
         $is_video = true;
         $view_title = 'Video';
-    } elseif (in_array($ext, fm_get_text_exts()) || substr($mime_type, 0, 4) == 'text' || in_array($mime_type, fm_get_text_mimes())) {
+    } elseif ($file_readable && (in_array($ext, fm_get_text_exts()) || substr($mime_type, 0, 4) == 'text' || in_array($mime_type, fm_get_text_mimes()))) {
         $is_text = true;
         $content = file_get_contents($file_path);
     }
@@ -2660,9 +2701,10 @@ if (isset($_GET['edit']) && !FM_READONLY) {
 
     $file_url = FM_ROOT_URL . fm_convert_win((FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $file);
     $file_path = $path . '/' . $file;
-    $file_writable = is_writable($file_path); // used by buttons, keyboard shortcuts, and save handler
-    // Check if the elevation daemon is available (only matters for unwritable files)
-    $elevate_available = !$file_writable ? fm_elevate_available($elevate_socket) : false;
+    $file_writable  = is_writable($file_path);
+    $file_readable  = is_readable($file_path);
+    // Elevation: available when unwritable OR unreadable (daemon reads/writes as root)
+    $elevate_available = (!$file_writable || !$file_readable) ? fm_elevate_available($elevate_socket) : false;
     $isNormalEditor = true;
     if (isset($_GET['env'])) {
         if ($_GET['env'] == "ace") {
@@ -2676,7 +2718,7 @@ if (isset($_GET['edit']) && !FM_READONLY) {
     $is_text = false;
     $content = ''; // for text
 
-    if (in_array($ext, fm_get_text_exts()) || substr($mime_type, 0, 4) == 'text' || in_array($mime_type, fm_get_text_mimes())) {
+    if ($file_readable && (in_array($ext, fm_get_text_exts()) || substr($mime_type, 0, 4) == 'text' || in_array($mime_type, fm_get_text_mimes()))) {
         $is_text = true;
         $content = file_get_contents($file_path);
     }
@@ -2744,11 +2786,17 @@ if (isset($_GET['edit']) && !FM_READONLY) {
         }
         // Inject elevation state for JS
         $ea = $elevate_available ? 'true' : 'false';
+        $fr = $file_readable    ? 'true' : 'false';
         $editor_type = $isNormalEditor ? 'nrl' : 'ace';
         echo '<script>';
         echo 'window.mfmElevateAvailable=' . $ea . ';';
-        echo 'window.mfmEditorType=' . json_encode($editor_type) . ';';
+        echo 'window.mfmFileReadable='    . $fr . ';';
+        echo 'window.mfmEditorType='      . json_encode($editor_type) . ';';
         echo 'window.mfmElevateState={active:false,username:"",password:""};';
+        // Auto-trigger elevation modal if file is unreadable and daemon is up
+        if (!$file_readable && $elevate_available) {
+            echo 'document.addEventListener("DOMContentLoaded",function(){mfmShowElevateModal();});';
+        }
         echo '</script>';
         ?>
 <?php
@@ -3292,6 +3340,7 @@ function fm_copy($f1, $f2, $upd)
  */
 function fm_get_mime_type($file_path)
 {
+    if (!is_readable($file_path)) return '--';
     if (function_exists('finfo_open')) {
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $mime = finfo_file($finfo, $file_path);
@@ -5819,12 +5868,19 @@ function fm_show_header_login()
                 document.getElementById('mfm-elevate-user').value = '';
                 document.getElementById('mfm-elevate-pass').value = '';
                 var msg = document.getElementById('mfm-elevate-msg');
-                msg.textContent = '';
                 msg.classList.remove('text-danger', 'text-success');
+                // Tell the user WHY they're elevating
+                if (!window.mfmFileReadable) {
+                    msg.textContent = '⚠️ This file is not readable by the web server. Authenticate to load and edit it.';
+                    msg.classList.add('text-danger');
+                } else {
+                    msg.textContent = '';
+                }
                 document.getElementById('mfm-elevate-begin').style.display = 'none';
                 var btn = document.getElementById('mfm-elevate-check-btn');
                 btn.disabled = false;
                 btn.textContent = 'Verify Access';
+                btn.style.display = '';
             }
 
             function mfmCheckElevate() {
@@ -5869,32 +5925,70 @@ function fm_show_header_login()
                 window.mfmElevateState.username = window.mfmElevateState._pendingUser;
                 window.mfmElevateState.password = window.mfmElevateState._pendingPass;
 
-                document.getElementById('mfm-readonly-badge').style.display = 'none';
-                document.getElementById('mfm-elevate-btn').style.display = 'none';
-                var saveBtn = document.getElementById('mfm-save-btn');
-                saveBtn.classList.remove('btn-secondary'); saveBtn.classList.add('btn-danger');
-                saveBtn.disabled = false; saveBtn.removeAttribute('title');
-                document.getElementById('mfm-save-label').textContent = 'Save (Elevated)';
+                var beginBtn = document.getElementById('mfm-elevate-begin');
+                beginBtn.disabled = true;
+                beginBtn.textContent = 'Loading…';
 
-                if (window.mfmEditorType === 'ace' && typeof editor !== 'undefined') {
-                    editor.setReadOnly(false);
-                    editor.commands.addCommands([{
-                        name: 'save',
-                        bindKey: { win: 'Ctrl-S', mac: 'Command-S' },
-                        exec: function() { edit_save(this, 'ace'); }
-                    }]);
-                } else {
-                    var ta = document.getElementById('normal-editor');
-                    if (ta) {
-                        ta.removeAttribute('readonly');
-                        document.addEventListener('keydown', function(e) {
-                            if ((window.navigator.platform.match('Mac') ? e.metaKey : e.ctrlKey) && e.keyCode == 83) {
-                                e.preventDefault(); edit_save(this, 'nrl');
-                            }
-                        }, false);
+                function _unlockEditor(content) {
+                    bootstrap.Modal.getOrCreateInstance(document.getElementById('mfm-elevate-modal')).hide();
+                    document.getElementById('mfm-readonly-badge') && (document.getElementById('mfm-readonly-badge').style.display = 'none');
+                    document.getElementById('mfm-elevate-btn')    && (document.getElementById('mfm-elevate-btn').style.display = 'none');
+                    var saveBtn = document.getElementById('mfm-save-btn');
+                    if (saveBtn) {
+                        saveBtn.classList.remove('btn-secondary'); saveBtn.classList.add('btn-danger');
+                        saveBtn.disabled = false; saveBtn.removeAttribute('title');
+                    }
+                    document.getElementById('mfm-save-label') && (document.getElementById('mfm-save-label').textContent = 'Save (Elevated)');
+
+                    if (window.mfmEditorType === 'ace' && typeof editor !== 'undefined') {
+                        if (content !== null) editor.setValue(content, -1);
+                        editor.setReadOnly(false);
+                        editor.commands.addCommands([{
+                            name: 'save',
+                            bindKey: { win: 'Ctrl-S', mac: 'Command-S' },
+                            exec: function() { edit_save(this, 'ace'); }
+                        }]);
+                    } else {
+                        var ta = document.getElementById('normal-editor');
+                        if (ta) {
+                            if (content !== null) ta.value = content;
+                            ta.removeAttribute('readonly');
+                            document.addEventListener('keydown', function(e) {
+                                if ((window.navigator.platform.match('Mac') ? e.metaKey : e.ctrlKey) && e.keyCode == 83) {
+                                    e.preventDefault(); edit_save(this, 'nrl');
+                                }
+                            }, false);
+                        }
                     }
                 }
 
+                if (!window.mfmFileReadable) {
+                    // File wasn't readable — do an elevated read to get content first
+                    mfmFetch({
+                        ajax: true, token: window.csrf, type: 'elevate_read',
+                        username: window.mfmElevateState.username,
+                        password: window.mfmElevateState.password
+                    }).then(function(res) {
+                        if (res && res.ok) {
+                            window.mfmFileReadable = true;
+                            _unlockEditor(res.content);
+                        } else {
+                            var msg = document.getElementById('mfm-elevate-msg');
+                            msg.textContent = '❌ ' + ((res && res.error) ? res.error : 'Read failed.');
+                            msg.classList.remove('text-success'); msg.classList.add('text-danger');
+                            beginBtn.disabled = false; beginBtn.textContent = 'Begin Editing';
+                        }
+                    }).catch(function(err) {
+                        var msg = document.getElementById('mfm-elevate-msg');
+                        msg.textContent = '❌ ' + (err.message || 'Request failed.');
+                        msg.classList.remove('text-success'); msg.classList.add('text-danger');
+                        beginBtn.disabled = false; beginBtn.textContent = 'Begin Editing';
+                    });
+                } else {
+                    // File was already readable, just unlock for elevated write
+                    _unlockEditor(null);
+                }
+            }
                 bootstrap.Modal.getOrCreateInstance(document.getElementById('mfm-elevate-modal')).hide();
                 toast('⚡ Elevated. Editor unlocked — Save (Elevated) is active.');
             }

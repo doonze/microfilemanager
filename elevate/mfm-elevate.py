@@ -2,11 +2,12 @@
 """
 mfm-elevate — MicroFileManager privilege-elevation daemon
 ==========================================================
-Listens on a Unix socket and handles three actions:
+Listens on a Unix socket and handles four actions:
 
     ping        → health check / daemon detection
-    check       → authenticate user via PAM, verify write access to the target file
-                  (sudo group member OR file owner with write bit)
+    check       → authenticate user via PAM, verify read/write access to target file
+                  (sudo group member OR file owner with appropriate bit)
+    read        → re-authenticate, then return file content as root
     write       → re-authenticate, then write file content as root
 
 Security rules (all enforced server-side, not in PHP):
@@ -97,6 +98,29 @@ def user_can_write(username: str, filepath: str) -> tuple:
         uid = pwd.getpwnam(username).pw_uid
         st  = os.stat(filepath)
         if st.st_uid == uid and (st.st_mode & stat.S_IWUSR):
+            return True, "owner"
+    except (KeyError, OSError):
+        pass
+
+    return False, ""
+
+
+def user_can_read(username: str, filepath: str) -> tuple:
+    """
+    Return (allowed: bool, reason: str) where reason is one of:
+      'sudo'  — user is in the sudo group (can read anything)
+      'owner' — user owns the file and has the owner-read bit set
+      ''      — neither; access denied
+
+    PAM authentication must be verified BEFORE calling this.
+    """
+    if user_in_sudo_group(username):
+        return True, "sudo"
+
+    try:
+        uid = pwd.getpwnam(username).pw_uid
+        st  = os.stat(filepath)
+        if st.st_uid == uid and (st.st_mode & stat.S_IRUSR):
             return True, "owner"
     except (KeyError, OSError):
         pass
@@ -262,9 +286,55 @@ def handle_write(req: dict) -> dict:
         return {"ok": False, "error": f"Write failed: {exc}"}
 
 
+def handle_read(req: dict) -> dict:
+    """
+    Authenticate and return file content as root.
+
+    Security mirrors handle_write: re-authenticates on every call,
+    checks sudo group membership, respects BLOCKED_PATHS and MAX_CONTENT_BYTES.
+    """
+    username = req.get("username", "").strip()
+    password = req.get("password", "")
+    filepath = req.get("filepath", "").strip()
+
+    if not username or not password or not filepath:
+        return {"ok": False, "error": "Missing required fields."}
+
+    if username == "root":
+        return {"ok": False, "error": "root cannot be used for elevation."}
+
+    if path_is_blocked(filepath):
+        return {"ok": False, "error": "That path is restricted and cannot be elevated."}
+
+    if not authenticate(username, password):
+        log.warning("read: PAM auth FAILED for user '%s' on '%s'", username, filepath)
+        return {"ok": False, "error": "Authentication failed. Check username and password."}
+
+    allowed, reason = user_can_read(username, filepath)
+    if not allowed:
+        log.warning("read: user '%s' denied for '%s' (not sudo, not owner)", username, filepath)
+        return {"ok": False, "error": "Access denied: user does not have sudo privileges and does not own this file."}
+
+    if not os.path.isfile(filepath):
+        return {"ok": False, "error": "File not found or is not a regular file."}
+
+    try:
+        size = os.path.getsize(filepath)
+        if size > MAX_CONTENT_BYTES:
+            return {"ok": False, "error": f"File exceeds the {MAX_CONTENT_BYTES // (1024*1024)} MB read limit."}
+        with open(filepath, "r", encoding="utf-8", errors="replace") as fh:
+            content = fh.read()
+        log.info("read: OK — user '%s' read '%s' (via %s)", username, filepath, reason)
+        return {"ok": True, "content": content}
+    except Exception as exc:
+        log.error("read: FAILED '%s' → '%s': %s", username, filepath, exc)
+        return {"ok": False, "error": f"Read failed: {exc}"}
+
+
 HANDLERS = {
     "ping":  handle_ping,
     "check": handle_check,
+    "read":  handle_read,
     "write": handle_write,
 }
 
