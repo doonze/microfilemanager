@@ -1034,6 +1034,28 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
     exit();
 }
 
+// ── Raw image serve (for hover preview when files are outside web root) ─────────────
+// Requires valid session or no-auth mode. No token needed — read-only, images only.
+if (isset($_GET['raw']) && (isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_ID]['logged']]) || !FM_USE_AUTH)) {
+    $path = FM_ROOT_PATH;
+    if (FM_PATH != '') $path .= '/' . FM_PATH;
+    $raw_file = str_replace('/', '', fm_clean_path($_GET['raw']));
+    $raw_path = $path . '/' . $raw_file;
+    $raw_ext  = strtolower(pathinfo($raw_file, PATHINFO_EXTENSION));
+    $raw_allowed = ['gif','jpg','jpeg','png','bmp','ico','svg','webp','avif'];
+
+    if ($raw_file && in_array($raw_ext, $raw_allowed) && is_file($raw_path) && is_readable($raw_path)) {
+        $raw_mime = fm_get_mime_type($raw_path);
+        header('Content-Type: ' . $raw_mime);
+        header('Content-Length: ' . filesize($raw_path));
+        header('Cache-Control: private, max-age=3600');
+        readfile($raw_path);
+    } else {
+        header('HTTP/1.1 404 Not Found');
+    }
+    exit();
+}
+
 // Delete file / folder
 if (isset($_GET['del'], $_POST['token']) && !FM_READONLY) {
     $del = str_replace('/', '', fm_clean_path($_GET['del']));
@@ -3046,7 +3068,7 @@ $all_files_size = 0;
                         <div class="filename">
                             <?php
                             if (in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), array('gif', 'jpg', 'jpeg', 'png', 'bmp', 'ico', 'svg', 'webp', 'avif'))): ?>
-                                <?php $imagePreview = fm_enc(FM_ROOT_URL . (FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $f); ?>
+                                <?php $imagePreview = FM_SELF_URL . '?p=' . urlencode(FM_PATH) . '&raw=' . urlencode($f); ?>
                                 <a href="<?php echo $filelink ?>" data-preview-image="<?php echo $imagePreview ?>" title="<?php echo fm_enc($f) ?>">
                                 <?php else: ?>
                                     <a href="<?php echo $filelink ?>" title="<?php echo $f ?>">
