@@ -2389,7 +2389,7 @@ if (isset($_GET['settings']) && !FM_READONLY) {
                     </div>
 
                     <div class="mb-3 row">
-                        <label for="js-3-1" class="col-sm-3 col-form-label"><?php echo lng('Theme') ?></label>
+                        <label for="js-3-0" class="col-sm-3 col-form-label"><?php echo lng('Theme') ?></label>
                         <div class="col-sm-5">
                             <select class="form-select w-100 text-capitalize" id="js-3-0" name="js-theme-3">
                                 <option value='light' <?php if ($theme == "light") {
@@ -2460,7 +2460,7 @@ if (isset($_GET['help'])) {
                         <form class="form-inline" onsubmit="return new_password_hash(this)" method="POST" action="">
                             <input type="hidden" name="type" value="pwdhash" aria-label="hidden" aria-hidden="true">
                             <div class="form-group mb-2">
-                                <label for="staticEmail2"><?php echo lng('Generate new password hash') ?></label>
+                                <label><?php echo lng('Generate new password hash') ?></label>
                             </div>
                             <div class="form-group mx-sm-3 mb-2">
                                 <label for="inputPassword2" class="sr-only"><?php echo lng('Password') ?></label>
