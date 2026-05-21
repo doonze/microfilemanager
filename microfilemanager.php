@@ -2785,6 +2785,9 @@ if (isset($_GET['edit']) && !FM_READONLY) {
     if ($file_readable && (in_array($ext, fm_get_text_exts()) || substr($mime_type, 0, 4) == 'text' || in_array($mime_type, fm_get_text_mimes()))) {
         $is_text = true;
         $content = file_get_contents($file_path);
+    } elseif (!$file_readable && in_array($ext, fm_get_text_exts())) {
+        // Unreadable but looks like text by extension — allow elevation flow
+        $is_text = true;
     }
 
 ?>
@@ -2829,7 +2832,7 @@ if (isset($_GET['edit']) && !FM_READONLY) {
                             <button type="button" id="mfm-save-btn" class="btn btn-sm <?php echo $file_writable ? 'btn-success' : 'btn-secondary'; ?>" name="Save" data-url="<?php echo fm_enc($file_url) ?>" onclick="edit_save(this,'ace')" <?php echo $file_writable ? '' : 'disabled title="File is read-only"'; ?>><i class="fa fa-floppy-o"></i> <span id="mfm-save-label"><?php echo lng('Save') ?></span>
                             </button>
                         <?php } ?>
-                        <?php if (!$file_writable && $elevate_available): ?>
+                        <?php if ((!$file_writable || !$file_readable) && $elevate_available): ?>
                             <button type="button" id="mfm-elevate-btn" class="btn btn-sm btn-warning" onclick="mfmShowElevateModal()" title="Edit this file with elevated privileges"><i class="fa fa-bolt"></i> Elevate</button>
                         <?php endif; ?>
                     <?php } ?>
