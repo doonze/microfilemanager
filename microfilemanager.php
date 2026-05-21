@@ -590,10 +590,8 @@ if ($use_auth && isset($_SESSION[FM_SESSION_ID]['logged'])) {
 
 // clean and check $root_path
 $root_path = rtrim($root_path, '\\/');
-// rtrim strips all slashes — if the result is empty the user set '/' (filesystem root). Restore it.
-if ($root_path === '') $root_path = '/';
 $root_path = str_replace('\\', '/', $root_path);
-if (!@is_dir($root_path)) {
+if (!@is_dir($root_path ?: '/')) {
     echo "<h1>" . lng('Root path') . " \"{$root_path}\" " . lng('not found!') . " </h1>";
     exit;
 }
