@@ -13,6 +13,45 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - **Image/audio/video hover preview via `?raw=` endpoint** — new PHP handler serves
   media files directly from the filesystem through PHP, bypassing Apache DocumentRoot
+  restrictions. Output buffers flushed before `readfile()` to prevent buffered HTML
+  corrupting binary data. Allowlist extended to include mkv/avi/m4v/wmv/flv/m4a/opus.
+- **Elevation on view page** — unreadable files show Permission denied banner with
+  ⚡ Elevate to View button. After credentials verified, content loads into `<pre>`.
+  Modal does NOT auto-open on page load — user sees file info first and decides.
+- **Permissions/Owner row on view page** — file info table now shows octal permissions
+  and `owner:group` using `posix_getpwuid` / `posix_getgrgid`.
+- **ACE editor safe init + lazy-init** — ACE wrapped in IIFE with `getElementById`
+  guard; if `#editor` not in DOM, warns and returns gracefully instead of throwing
+  uncaught exception that killed `renderThemeMode()` and all toolbar wiring.
+  `_unlockEditor` lazy-inits ACE using `window.mfmAceMode` / `window.mfmAceTheme`
+  if editor is still null when elevation supplies content.
+
+### Fixed
+- **Redirect loop on home for root-path users** — `FM_ROOT_PATH=''` + `FM_PATH=''`
+  produced `$path=''`, `is_dir('')=false` → infinite redirect. Restored `$root_path='/'`
+  fallback; cosmetic double-slash fixed in `fm_get_display_path()` with `preg_replace`.
+- **Edit block missing `$file = $_GET['edit']`** — edit handler used leftover `$file`
+  from `foreach` directory scan. For unreadable dirs, scan returns `[]`, `$file` was
+  undefined → `is_file` check failed → redirect before editor rendered. Matched view
+  block pattern: `$file = $_GET['edit']; fm_clean_path(); str_replace()`.
+- **`$ext` out of scope in `fm_show_footer()`** — lazy-init ACE code used
+  `<?php echo $ext ?>` inside footer function where `$ext` is undefined → PHP notice
+  injected into JS string → SyntaxError killed entire script block →
+  `mfmShowElevateModal` undefined on every page. Fixed with `window.mfmAceMode`
+  injected from edit page scope where `$ext` IS defined.
+- **Elevation handlers ignored `?view=` param** — `elevate_check`, `elevate_read`,
+  and `elevate_write` only checked `$_GET['edit']`; view page uses `$_GET['view']`
+  → "File not found" on verify. All three now use `$_GET['edit'] ?? $_GET['view']`.
+- **Unreadable files on edit page crashed ACE** — `$is_text=false` for unreadable
+  files meant no `#editor` div rendered, ACE `ace.edit('editor')` threw uncaught
+  exception. Added extension-based detection to set `$is_text=true` for unreadable
+  files matching known text extensions.
+- **Elevate button hidden for unreadable-only files** — button condition was
+  `!$file_writable` only; now `!$file_writable || !$file_readable`.
+- **Label mismatches** — `for="js-3-1"` → `for="js-3-0"` (theme select);
+  `for="staticEmail2"` removed (no matching element, Bootstrap boilerplate).
+- **MKV and other video formats missing from `?raw=` allowlist** — added mkv/avi/
+  m4v/wmv/flv/m4a/opus/weba.
   restrictions. Required when `FM_ROOT_PATH` is outside the web root (e.g. set to `/`).
   Allowlist: gif/jpg/jpeg/png/bmp/ico/svg/webp/avif/mp3/ogg/wav/flac/mp4/webm/ogv/mov.
   Session-gated (requires valid login). Output buffers flushed before `readfile()` to
