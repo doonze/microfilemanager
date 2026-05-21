@@ -775,7 +775,7 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
 
         $path = FM_ROOT_PATH;
         if (FM_PATH != '') $path .= '/' . FM_PATH;
-        $file = fm_clean_path($_GET['edit'] ?? '', false);
+        $file = fm_clean_path($_GET['edit'] ?? $_GET['view'] ?? '', false);
         $file = str_replace('/', '', $file);
         $file_path = $path . '/' . $file;
 
@@ -812,7 +812,7 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
 
         $path = FM_ROOT_PATH;
         if (FM_PATH != '') $path .= '/' . FM_PATH;
-        $file = fm_clean_path($_GET['edit'] ?? '', false);
+        $file = fm_clean_path($_GET['edit'] ?? $_GET['view'] ?? '', false);
         $file = str_replace('/', '', $file);
         $file_path = $path . '/' . $file;
 
@@ -858,7 +858,7 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
 
         $path = FM_ROOT_PATH;
         if (FM_PATH != '') $path .= '/' . FM_PATH;
-        $file = fm_clean_path($_GET['edit'] ?? '', false);
+        $file = fm_clean_path($_GET['edit'] ?? $_GET['view'] ?? '', false);
         $file = str_replace('/', '', $file);
         $file_path = $path . '/' . $file;
 
