@@ -6511,7 +6511,7 @@ function fm_show_header_login()
                             }
                         };
                     if (_data && _data.aceMode) {
-                        $modeEl.html(optionNode("ace/mode/", _data.aceMode));
+                        modeEl.innerHTML = optionNode("ace/mode/", _data.aceMode);
                     }
                     if (_data && _data.aceTheme) {
                         var lightTheme = optionNode("ace/theme/", _data.aceTheme.bright),
