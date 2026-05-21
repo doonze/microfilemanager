@@ -1042,7 +1042,7 @@ if (isset($_GET['raw']) && (isset($_SESSION[FM_SESSION_ID]['logged'], $auth_user
     $raw_file = str_replace('/', '', fm_clean_path($_GET['raw']));
     $raw_path = $path . '/' . $raw_file;
     $raw_ext  = strtolower(pathinfo($raw_file, PATHINFO_EXTENSION));
-    $raw_allowed = ['gif','jpg','jpeg','png','bmp','ico','svg','webp','avif'];
+    $raw_allowed = ['gif','jpg','jpeg','png','bmp','ico','svg','webp','avif','mp3','ogg','wav','flac','mp4','webm','ogv','mov'];
 
     if ($raw_file && in_array($raw_ext, $raw_allowed) && is_file($raw_path) && is_readable($raw_path)) {
         $raw_mime = fm_get_mime_type($raw_path);
@@ -2501,6 +2501,8 @@ if (isset($_GET['view'])) {
     fm_show_nav_path(FM_PATH); // current path
 
     $file_url = FM_ROOT_URL . fm_convert_win((FM_PATH != '' ? '/' . FM_PATH : '') . '/' . $file);
+    // Route media through ?raw= so files outside the web root are served via PHP
+    $raw_url  = FM_SELF_URL . '?p=' . urlencode(FM_PATH) . '&raw=' . urlencode($file);
     $file_path = $path . '/' . $file;
     $file_writable  = is_writable($file_path);
     $file_readable  = is_readable($file_path);
@@ -2659,14 +2661,12 @@ if (isset($_GET['view'])) {
                 } elseif ($is_image) {
                     // Image content
                     if (in_array($ext, array('gif', 'jpg', 'jpeg', 'png', 'bmp', 'ico', 'svg', 'webp', 'avif'))) {
-                        echo '<p><input type="checkbox" id="preview-img-zoomCheck"><label for="preview-img-zoomCheck"><img src="' . fm_enc($file_url) . '" alt="image" class="preview-img"></label></p>';
+                        echo '<p><input type="checkbox" id="preview-img-zoomCheck"><label for="preview-img-zoomCheck"><img src="' . fm_enc($raw_url) . '" alt="image" class="preview-img"></label></p>';
                     }
                 } elseif ($is_audio) {
-                    // Audio content
-                    echo '<p><audio src="' . fm_enc($file_url) . '" controls preload="metadata"></audio></p>';
+                    echo '<p><audio src="' . fm_enc($raw_url) . '" controls preload="metadata"></audio></p>';
                 } elseif ($is_video) {
-                    // Video content
-                    echo '<div class="preview-video"><video src="' . fm_enc($file_url) . '" width="640" height="360" controls preload="metadata"></video></div>';
+                    echo '<div class="preview-video"><video src="' . fm_enc($raw_url) . '" width="640" height="360" controls preload="metadata"></video></div>';
                 } elseif ($is_text) {
                     if (FM_USE_HIGHLIGHTJS) {
                         // highlight
