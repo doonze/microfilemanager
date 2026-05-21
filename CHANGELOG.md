@@ -10,7 +10,59 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [3.4] - Unreleased
 
+### Added
+- **Image/audio/video hover preview via `?raw=` endpoint** — new PHP handler serves
+  media files directly from the filesystem through PHP, bypassing Apache DocumentRoot
+  restrictions. Required when `FM_ROOT_PATH` is outside the web root (e.g. set to `/`).
+  Allowlist: gif/jpg/jpeg/png/bmp/ico/svg/webp/avif/mp3/ogg/wav/flac/mp4/webm/ogv/mov.
+  Session-gated (requires valid login). Output buffers flushed before `readfile()` to
+  prevent buffered HTML from corrupting binary data. `Content-Length` set cleanly.
+- **Privilege elevation extended to unreadable files** — files that `www-data` cannot
+  read (e.g. `root:root 640`) now auto-open the elevation modal on the edit page with
+  a clear "not readable" warning. After authentication, content is fetched via a new
+  `elevate_read` AJAX endpoint + daemon `read` action. Editor unlocks with file content
+  loaded. Elevation daemon (`mfm-elevate.py`) updated: new `user_can_read()` helper,
+  new `handle_read()` action, HANDLERS dict updated to `ping/check/read/write`.
+- **GitHub Pages site** — `docs/index.html` landing page + `docs/pwd.html` client-side
+  bcrypt password generator. `.nojekyll` added.
+- **Favicon** — `favicon.svg` (dark navy + blue folder + amber lightning bolt) and
+  `favicon.ico` (16+32 dual-size). SVG-first with ICO fallback in both head sections.
+  User `$favicon_path` config still takes priority.
+
+### Fixed
+- **`FM_ROOT_PATH` double-slash when root set to `/` or `''`** — previous session added
+  a restore line that forced `FM_ROOT_PATH` back to `/` after rtrim, breaking all path
+  construction (`//var/www/...`). Removed restore line; `is_dir` check now uses
+  `$root_path ?: '/'` as fallback only for validation.
+- **`fm_get_mime_type()` PHP warning on unreadable files** — added `is_readable()` guard;
+  returns `'--'` instead of triggering `finfo_file()` permission denied warning.
+- **View/edit page PHP warnings on unreadable files** — `file_get_contents()` now guarded
+  behind `$file_readable` flag on both view and edit pages.
+- **Elevation modal auto-shows for unreadable files** — `window.mfmFileReadable` injected
+  into page JS; DOMContentLoaded triggers modal automatically when file is unreadable.
+- **Orphaned lines from `mfmBeginElevatedEdit` rewrite** — old function's closing
+  `modal.hide()` + `toast()` + `}` left behind, causing JS SyntaxError that broke all
+  JavaScript site-wide.
+- **Missing `if` condition on backup AJAX handler** — eaten during `elevate_read`
+  insertion, causing PHP parse error and 500 on every page load.
+- **ACE editor mode selector `$modeEl` reference error** — leftover jQuery variable from
+  vanilla JS conversion; converted to `modeEl.innerHTML`.
+- **`aria-hidden` console warning on modals** — removed static `aria-hidden="true"`
+  attribute from upload conflict, create item, elevate, and search modals.
+- **Upload conflict modal focus warning** — added `document.activeElement.blur()` before
+  `modal.hide()` in `resolveConflict()` and `bulkResolve()` to release focus before hide.
+
 ### Changed
+- **View page image/audio/video** now served via `?raw=` instead of direct `FM_ROOT_URL`
+  links — works correctly regardless of where `FM_ROOT_PATH` points on the filesystem.
+- **`$elevate_available`** now true when file is unwritable OR unreadable (was only
+  unwritable). Elevation now covers the full read+write case for restricted files.
+
+### Removed
+- **jQuery** — see v3.4 entries above
+- **DataTables** — see v3.4 entries above
+- **`previewImage` jQuery plugin** — see v3.4 entries above
+
 - **Removed jQuery dependency entirely** — all `$.ajax()` calls replaced with a central
   `mfmFetch()` helper using native `fetch()`. All `$()` DOM selectors replaced with
   `document.getElementById` / `querySelector`. Bootstrap modal calls converted to
