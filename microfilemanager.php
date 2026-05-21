@@ -2859,6 +2859,8 @@ if (isset($_GET['edit']) && !FM_READONLY) {
         echo 'window.mfmElevateAvailable=' . $ea . ';';
         echo 'window.mfmFileReadable='    . $fr . ';';
         echo 'window.mfmEditorType='      . json_encode($editor_type) . ';';
+        echo 'window.mfmAceMode='         . json_encode($ext) . ';';
+        echo 'window.mfmAceTheme='        . json_encode(FM_ACE_THEME !== '' ? FM_ACE_THEME : '') . ';';
         echo 'window.mfmElevateState={active:false,username:"",password:""};';
         // Auto-trigger elevation modal if file is unreadable and daemon is up
         if (!$file_readable && $elevate_available) {
@@ -6017,8 +6019,8 @@ function fm_show_header_login()
                         // Lazy-init ACE if it wasn't ready on page load (e.g. unreadable file)
                         if (!editor && editorEl) {
                             editor = ace.edit(editorEl);
-                            editor.getSession().setMode('ace/mode/<?php echo $ext; ?>');
-                            <?php if (FM_ACE_THEME !== ''): ?>editor.setTheme('ace/theme/<?php echo htmlspecialchars(FM_ACE_THEME); ?>');<?php endif; ?>
+                            editor.getSession().setMode('ace/mode/' + (window.mfmAceMode || 'text'));
+                            if (window.mfmAceTheme) editor.setTheme('ace/theme/' + window.mfmAceTheme);
                             editor.setShowPrintMargin(false);
                         }
                         if (editor) {
