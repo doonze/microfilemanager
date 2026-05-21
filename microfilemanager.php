@@ -5990,9 +5990,6 @@ function fm_show_header_login()
                     _unlockEditor(null);
                 }
             }
-                bootstrap.Modal.getOrCreateInstance(document.getElementById('mfm-elevate-modal')).hide();
-                toast('⚡ Elevated. Editor unlocked — Save (Elevated) is active.');
-            }
 
             function show_new_pwd() {
                 document.querySelector('.js-new-pwd').classList.toggle('hidden');
