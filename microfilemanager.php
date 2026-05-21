@@ -1042,6 +1042,10 @@ if (isset($_GET['raw']) && (isset($_SESSION[FM_SESSION_ID]['logged'], $auth_user
     $raw_allowed = ['gif','jpg','jpeg','png','bmp','ico','svg','webp','avif','mp3','ogg','wav','flac','mp4','webm','ogv','mov'];
 
     if ($raw_file && in_array($raw_ext, $raw_allowed) && is_file($raw_path) && is_readable($raw_path)) {
+        // Discard any buffered output (HTML, warnings, session data) before
+        // sending binary file — mixed output corrupts image/audio/video data
+        while (ob_get_level() > 0) ob_end_clean();
+        session_write_close();
         $raw_mime = fm_get_mime_type($raw_path);
         header('Content-Type: ' . $raw_mime);
         header('Content-Length: ' . filesize($raw_path));
