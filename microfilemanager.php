@@ -591,7 +591,10 @@ if ($use_auth && isset($_SESSION[FM_SESSION_ID]['logged'])) {
 // clean and check $root_path
 $root_path = rtrim($root_path, '\\/');
 $root_path = str_replace('\\', '/', $root_path);
-if (!@is_dir($root_path ?: '/')) {
+// If root resolves to empty (user set '/' or ''), restore to '/' so path
+// construction never produces an empty string that breaks is_dir() checks.
+if ($root_path === '') $root_path = '/';
+if (!@is_dir($root_path)) {
     echo "<h1>" . lng('Root path') . " \"{$root_path}\" " . lng('not found!') . " </h1>";
     exit;
 }
@@ -3503,9 +3506,11 @@ function fm_get_display_path($file_path)
             );
         case 'full':
         default:
+            // Normalize double leading slash (occurs when root_path is '/' and FM_PATH is non-empty)
+            $display = preg_replace('#^//#', '/', $file_path);
             return array(
                 'label' => 'Full Path',
-                'path' => fm_enc(fm_convert_win($file_path))
+                'path' => fm_enc(fm_convert_win($display))
             );
     }
 }
