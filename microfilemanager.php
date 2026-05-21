@@ -6012,14 +6012,24 @@ function fm_show_header_login()
                     }
                     document.getElementById('mfm-save-label') && (document.getElementById('mfm-save-label').textContent = 'Save (Elevated)');
 
-                    if (window.mfmEditorType === 'ace' && typeof editor !== 'undefined') {
-                        if (content !== null) editor.setValue(content, -1);
-                        editor.setReadOnly(false);
-                        editor.commands.addCommands([{
-                            name: 'save',
-                            bindKey: { win: 'Ctrl-S', mac: 'Command-S' },
-                            exec: function() { edit_save(this, 'ace'); }
-                        }]);
+                    if (window.mfmEditorType === 'ace') {
+                        var editorEl = document.getElementById('editor');
+                        // Lazy-init ACE if it wasn't ready on page load (e.g. unreadable file)
+                        if (!editor && editorEl) {
+                            editor = ace.edit(editorEl);
+                            editor.getSession().setMode('ace/mode/<?php echo $ext; ?>');
+                            <?php if (FM_ACE_THEME !== ''): ?>editor.setTheme('ace/theme/<?php echo htmlspecialchars(FM_ACE_THEME); ?>');<?php endif; ?>
+                            editor.setShowPrintMargin(false);
+                        }
+                        if (editor) {
+                            if (content !== null) editor.setValue(content, -1);
+                            editor.setReadOnly(false);
+                            editor.commands.addCommands([{
+                                name: 'save',
+                                bindKey: { win: 'Ctrl-S', mac: 'Command-S' },
+                                exec: function() { edit_save(this, 'ace'); }
+                            }]);
+                        }
                     } else {
                         var ta = document.getElementById('normal-editor');
                         if (ta) {
@@ -6436,26 +6446,27 @@ function fm_show_header_login()
         ?>
             <?php print_external('js-ace'); ?>
             <script>
-                var editor = ace.edit("editor");
-                editor.getSession().setMode("ace/mode/<?php echo $ext; ?>");
-                <?php if (FM_ACE_THEME !== ''): ?>editor.setTheme("ace/theme/<?php echo htmlspecialchars(FM_ACE_THEME); ?>");<?php endif; ?>
-                editor.setShowPrintMargin(false); // Hide the vertical ruler
-                <?php if (!$_ace_file_writable): ?>editor.setReadOnly(true);<?php endif; ?>
-                function ace_commend(cmd) {
-                    editor.commands.exec(cmd, editor);
-                }
-                <?php if ($_ace_file_writable): ?>
-                editor.commands.addCommands([{
-                    name: 'save',
-                    bindKey: {
-                        win: 'Ctrl-S',
-                        mac: 'Command-S'
-                    },
-                    exec: function(editor) {
-                        edit_save(this, 'ace');
+                var editor = null;
+                (function() {
+                    var editorEl = document.getElementById('editor');
+                    if (!editorEl) {
+                        console.warn('MFM: #editor not in DOM yet — ACE will init after elevation loads content');
+                        return;
                     }
-                }]);
-                <?php endif; ?>
+                    editor = ace.edit(editorEl);
+                    editor.getSession().setMode("ace/mode/<?php echo $ext; ?>");
+                    <?php if (FM_ACE_THEME !== ''): ?>editor.setTheme("ace/theme/<?php echo htmlspecialchars(FM_ACE_THEME); ?>");<?php endif; ?>
+                    editor.setShowPrintMargin(false);
+                    <?php if (!$_ace_file_writable): ?>editor.setReadOnly(true);<?php endif; ?>
+                    function ace_commend(cmd) { editor.commands.exec(cmd, editor); }
+                    <?php if ($_ace_file_writable): ?>
+                    editor.commands.addCommands([{
+                        name: 'save',
+                        bindKey: { win: 'Ctrl-S', mac: 'Command-S' },
+                        exec: function(editor) { edit_save(this, 'ace'); }
+                    }]);
+                    <?php endif; ?>
+                }());
 
                 function renderThemeMode() {
                     var modeEl = document.querySelector('select#js-ace-mode'),
