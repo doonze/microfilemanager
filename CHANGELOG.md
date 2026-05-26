@@ -27,6 +27,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   if editor is still null when elevation supplies content.
 
 ### Fixed
+- **Elevation modal double-click removed** — verifying credentials now immediately
+  fires edit/view action on success. The redundant "Begin Editing/Viewing" button is
+  gone. Verify button shows "Loading…" as feedback while action fires. Null ref crash
+  (setting `disabled` on removed button element) also fixed.
 - **Redirect loop on home for root-path users** — `FM_ROOT_PATH=''` + `FM_PATH=''`
   produced `$path=''`, `is_dir('')=false` → infinite redirect. Restored `$root_path='/'`
   fallback; cosmetic double-slash fixed in `fm_get_display_path()` with `preg_replace`.
