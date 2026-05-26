@@ -52,6 +52,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `for="staticEmail2"` removed (no matching element, Bootstrap boilerplate).
 - **MKV and other video formats missing from `?raw=` allowlist** — added mkv/avi/
   m4v/wmv/flv/m4a/opus/weba.
+- **Root-owned files showing `?:root` in file listing and view page** — upstream
+  TinyFileManager had an explicit `if ($owner_id != 0)` guard in both directory listing
+  blocks that intentionally skipped `posix_getpwuid()` for uid 0, leaving the default
+  `array('name' => '?')` in place. Group had no equivalent skip so gid 0 correctly
+  resolved to `root` via `posix_getgrgid()`. Fixed all three locations (2× listing
+  blocks + view page): uid/gid 0 now explicitly maps to `'root'` before any posix call.
   restrictions. Required when `FM_ROOT_PATH` is outside the web root (e.g. set to `/`).
   Allowlist: gif/jpg/jpeg/png/bmp/ico/svg/webp/avif/mp3/ogg/wav/flac/mp4/webm/ogv/mov.
   Session-gated (requires valid login). Output buffers flushed before `readfile()` to
