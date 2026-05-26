@@ -6004,9 +6004,8 @@ function fm_show_header_login()
                 window.mfmElevateState.username = window.mfmElevateState._pendingUser;
                 window.mfmElevateState.password = window.mfmElevateState._pendingPass;
 
-                var beginBtn = document.getElementById('mfm-elevate-begin');
-                beginBtn.disabled = true;
-                beginBtn.textContent = 'Loading…';
+                var checkBtn = document.getElementById('mfm-elevate-check-btn');
+                if (checkBtn) { checkBtn.disabled = true; checkBtn.textContent = 'Loading…'; }
 
                 function _unlockEditor(content) {
                     bootstrap.Modal.getOrCreateInstance(document.getElementById('mfm-elevate-modal')).hide();
