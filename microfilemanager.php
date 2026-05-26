@@ -2518,8 +2518,10 @@ if (isset($_GET['view'])) {
     $file_group = '-';
     $file_perms = '-';
     if ($file_stat) {
-        $file_owner = function_exists('posix_getpwuid') ? (posix_getpwuid($file_stat['uid'])['name'] ?? $file_stat['uid']) : $file_stat['uid'];
-        $file_group = function_exists('posix_getgrgid') ? (posix_getgrgid($file_stat['gid'])['name'] ?? $file_stat['gid']) : $file_stat['gid'];
+        $uid = $file_stat['uid'];
+        $gid = $file_stat['gid'];
+        $file_owner = ($uid === 0) ? 'root' : (function_exists('posix_getpwuid') ? (posix_getpwuid($uid)['name'] ?? $uid) : $uid);
+        $file_group = ($gid === 0) ? 'root' : (function_exists('posix_getgrgid') ? (posix_getgrgid($gid)['name'] ?? $gid) : $gid);
         $file_perms = substr(sprintf('%o', $file_stat['mode']), -4);
     }
 
@@ -3013,16 +3015,22 @@ $all_files_size = 0;
                 if (function_exists('posix_getpwuid') && function_exists('posix_getgrgid')) {
                     try {
                         $owner_id = fileowner($path . '/' . $f);
-                        if ($owner_id != 0) {
+                        if ($owner_id === 0) {
+                            $owner = array('name' => 'root');
+                        } else {
                             $owner_info = posix_getpwuid($owner_id);
                             if ($owner_info) {
-                                $owner =  $owner_info;
+                                $owner = $owner_info;
                             }
                         }
                         $group_id = filegroup($path . '/' . $f);
-                        $group_info = posix_getgrgid($group_id);
-                        if ($group_info) {
-                            $group =  $group_info;
+                        if ($group_id === 0) {
+                            $group = array('name' => 'root');
+                        } else {
+                            $group_info = posix_getgrgid($group_id);
+                            if ($group_info) {
+                                $group = $group_info;
+                            }
                         }
                     } catch (Exception $e) {
                         error_log("exception:" . $e->getMessage());
@@ -3085,16 +3093,22 @@ $all_files_size = 0;
                 if (function_exists('posix_getpwuid') && function_exists('posix_getgrgid')) {
                     try {
                         $owner_id = fileowner($path . '/' . $f);
-                        if ($owner_id != 0) {
+                        if ($owner_id === 0) {
+                            $owner = array('name' => 'root');
+                        } else {
                             $owner_info = posix_getpwuid($owner_id);
                             if ($owner_info) {
-                                $owner =  $owner_info;
+                                $owner = $owner_info;
                             }
                         }
                         $group_id = filegroup($path . '/' . $f);
-                        $group_info = posix_getgrgid($group_id);
-                        if ($group_info) {
-                            $group =  $group_info;
+                        if ($group_id === 0) {
+                            $group = array('name' => 'root');
+                        } else {
+                            $group_info = posix_getgrgid($group_id);
+                            if ($group_info) {
+                                $group = $group_info;
+                            }
                         }
                     } catch (Exception $e) {
                         error_log("exception:" . $e->getMessage());
