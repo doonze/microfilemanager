@@ -6423,7 +6423,7 @@ function fm_show_header_login()
                 'wiki'        => 'text',
                 // Plain text catch-alls
                 'txt'         => 'text',
-                'log'         => 'text',
+                'log'         => 'log',
                 'passwd'      => 'text',
                 'ftpquota'    => 'text',
                 'gitignore'   => 'text',
