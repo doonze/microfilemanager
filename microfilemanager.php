@@ -5738,7 +5738,6 @@ function fm_show_header_login()
 <div class="modal-footer">
     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
     <button type="button" class="btn btn-warning" id="mfm-elevate-check-btn" onclick="mfmCheckElevate()"><i class="fa fa-key"></i> Verify Access</button>
-    <button type="button" class="btn btn-danger" id="mfm-elevate-begin" onclick="mfmBeginElevatedEdit()" style="display:none;"><i class="fa fa-unlock"></i> Begin Editing</button>
 </div>
 </div>
 </div>
@@ -5960,10 +5959,6 @@ function fm_show_header_login()
                 } else {
                     msg.textContent = '';
                 }
-                document.getElementById('mfm-elevate-begin').style.display = 'none';
-                // Label button for view vs edit context
-                var beginBtn = document.getElementById('mfm-elevate-begin');
-                beginBtn.textContent = (window.mfmElevateMode === 'view') ? 'Begin Viewing' : 'Begin Editing';
                 var btn = document.getElementById('mfm-elevate-check-btn');
                 btn.disabled = false;
                 btn.textContent = 'Verify Access';
@@ -5988,12 +5983,9 @@ function fm_show_header_login()
                 mfmFetch({ ajax: true, token: window.csrf, type: 'elevate_check', username: user, password: pass })
                     .then(function(res) {
                         if (res && res.ok) {
-                            msg.textContent = '✅ Access confirmed. You may now edit and save.';
-                            msg.classList.remove('text-danger'); msg.classList.add('text-success');
-                            document.getElementById('mfm-elevate-begin').style.display = '';
-                            btn.style.display = 'none';
                             window.mfmElevateState._pendingUser = user;
                             window.mfmElevateState._pendingPass = pass;
+                            mfmBeginElevatedEdit();
                         } else {
                             var err = (res && res.error) ? res.error : 'Access denied.';
                             msg.textContent = '❌ ' + err;
