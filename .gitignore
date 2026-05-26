@@ -23,6 +23,10 @@ wiki/
 Thumbs.db
 desktop.ini
 
+# Offline asset cache — populated by download_assets.py, not tracked in git.
+# Users/deployments run the script themselves to get offline support.
+mfm-assets/
+
 # Editor metadata
 .vscode/
 .idea/

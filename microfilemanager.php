@@ -220,20 +220,79 @@ if (is_readable($config_file)) {
     unset($_base_auth_users, $_base_readonly_users, $_base_directories_users);
 }
 
-// External CDN resources that can be used in the HTML (replace for GDPR compliance)
+// External CDN resources with local offline fallbacks.
+// Structure: 'key' => ['cdn' => '<tag>', 'local' => 'mfm-assets/relative/path']
+// local=null means CDN-only (no offline equivalent, e.g. preconnect hints).
+// fm_cdn_available() picks which to use; print_external() renders the tag.
 $external = array(
-    'css-bootstrap' => '<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">',
-    'css-dropzone' => '<link href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.css" rel="stylesheet">',
-    'css-font-awesome' => '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" crossorigin="anonymous">',
-    'css-highlightjs' => '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/' . $highlightjs_style . '.min.css">',
-    'js-ace' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.js"></script>',
-    'js-bootstrap' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>',
-    'js-dropzone' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.js"></script>',
-
-    'js-highlightjs' => '<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>',
-    'pre-jsdelivr' => '',  // jsdelivr replaced by cdnjs — preconnect no longer needed
-    'pre-cloudflare' => '<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin/><link rel="dns-prefetch" href="https://cdnjs.cloudflare.com"/>'
+    'css-bootstrap' => [
+        'cdn'   => '<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">',
+        'local' => 'bootstrap/bootstrap.min.css',
+        'tag'   => 'link-css',
+    ],
+    'css-dropzone' => [
+        'cdn'   => '<link href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.css" rel="stylesheet">',
+        'local' => 'dropzone/dropzone.min.css',
+        'tag'   => 'link-css',
+    ],
+    'css-font-awesome' => [
+        'cdn'   => '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" crossorigin="anonymous">',
+        'local' => 'fontawesome/css/font-awesome.min.css',
+        'tag'   => 'link-css',
+    ],
+    'css-highlightjs' => [
+        'cdn'   => '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/' . $highlightjs_style . '.min.css">',
+        'local' => 'highlightjs/styles/' . $highlightjs_style . '.min.css',
+        'tag'   => 'link-css',
+    ],
+    'js-ace' => [
+        'cdn'   => '<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.js"></script>',
+        'local' => 'ace/ace.js',
+        'tag'   => 'script',
+    ],
+    'js-bootstrap' => [
+        'cdn'   => '<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>',
+        'local' => 'bootstrap/bootstrap.bundle.min.js',
+        'tag'   => 'script',
+    ],
+    'js-dropzone' => [
+        'cdn'   => '<script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.js"></script>',
+        'local' => 'dropzone/dropzone.min.js',
+        'tag'   => 'script',
+    ],
+    'js-highlightjs' => [
+        'cdn'   => '<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>',
+        'local' => 'highlightjs/highlight.min.js',
+        'tag'   => 'script',
+    ],
+    // Preconnect hints — CDN-only, omit when serving locally
+    'pre-jsdelivr'   => ['cdn' => '', 'local' => null, 'tag' => 'raw'],
+    'pre-cloudflare' => [
+        'cdn'   => '<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin/><link rel="dns-prefetch" href="https://cdnjs.cloudflare.com"/>',
+        'local' => null,
+        'tag'   => 'raw',
+    ],
 );
+
+// CDN availability check — result cached 10 min in system temp to avoid
+// a network hit on every page load.
+function fm_cdn_available(): bool {
+    static $result = null;
+    if ($result !== null) return $result;
+
+    $cache_file = sys_get_temp_dir() . '/mfm_cdn_' . md5(__FILE__) . '.cache';
+    if (file_exists($cache_file) && (time() - filemtime($cache_file)) < 600) {
+        $result = (trim(file_get_contents($cache_file)) === '1');
+        return $result;
+    }
+
+    $sock = @fsockopen('cdnjs.cloudflare.com', 443, $errno, $errstr, 1.5);
+    $result = ($sock !== false);
+    if ($sock) fclose($sock);
+
+    @file_put_contents($cache_file, $result ? '1' : '0');
+    return $result;
+}
 
 // --- EDIT BELOW CAREFULLY OR DO NOT EDIT AT ALL ---
 
@@ -1032,6 +1091,43 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
             event_callback(array("fail" => $err));
         }
     }
+    exit();
+}
+
+// ── Offline asset serve (?mfm_asset=path) ────────────────────────────────────────────
+// Public — no auth required. CSS/JS needed on login page before session exists.
+// Serves files from ./mfm-assets/ only. Strict path validation; no traversal possible.
+if (isset($_GET['mfm_asset'])) {
+    $asset_key  = ltrim(preg_replace('/[^a-zA-Z0-9\/_\-.]/', '', $_GET['mfm_asset']), '/');
+    $assets_dir = rtrim(__DIR__, '/\\') . DIRECTORY_SEPARATOR . 'mfm-assets';
+    $asset_real = realpath($assets_dir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $asset_key));
+
+    // Reject traversal or missing files
+    if (!$asset_real || strpos($asset_real, realpath($assets_dir)) !== 0 || !is_file($asset_real)) {
+        http_response_code(404);
+        exit('Asset not found.');
+    }
+
+    $ext_map = [
+        'css'   => 'text/css',
+        'js'    => 'application/javascript',
+        'woff2' => 'font/woff2',
+        'woff'  => 'font/woff',
+        'ttf'   => 'font/ttf',
+        'otf'   => 'font/otf',
+        'eot'   => 'application/vnd.ms-fontobject',
+        'svg'   => 'image/svg+xml',
+        'json'  => 'application/json',
+        'map'   => 'application/json',
+    ];
+    $asset_ext  = strtolower(pathinfo($asset_real, PATHINFO_EXTENSION));
+    $asset_mime = $ext_map[$asset_ext] ?? 'application/octet-stream';
+
+    header('Content-Type: '    . $asset_mime);
+    header('Content-Length: '  . filesize($asset_real));
+    header('Cache-Control: public, max-age=86400'); // 1-day browser cache
+    header('X-MFM-Asset: offline');
+    readfile($asset_real);
     exit();
 }
 
@@ -3224,12 +3320,36 @@ function print_external($key)
     global $external;
 
     if (!array_key_exists($key, $external)) {
-        // throw new Exception('Key missing in external: ' . key);
         echo "<!-- EXTERNAL: MISSING KEY $key -->";
         return;
     }
 
-    echo "$external[$key]";
+    $entry = $external[$key];
+    $cdn   = fm_cdn_available();
+
+    // Use local asset if: CDN unavailable AND a local path is defined AND the file exists
+    $use_local = !$cdn
+        && $entry['local'] !== null
+        && file_exists(__DIR__ . '/mfm-assets/' . $entry['local']);
+
+    if (!$use_local) {
+        // CDN path (or empty string for obsolete entries)
+        echo $entry['cdn'];
+        return;
+    }
+
+    // Build the local tag — URL uses ?mfm_asset= endpoint (public, no auth needed)
+    $url = '?mfm_asset=' . htmlspecialchars($entry['local'], ENT_QUOTES);
+    switch ($entry['tag']) {
+        case 'link-css':
+            echo "<link rel=\"stylesheet\" href=\"{$url}\">";
+            break;
+        case 'script':
+            echo "<script src=\"{$url}\"></script>";
+            break;
+        default: // 'raw' or anything else — output nothing in offline mode
+            break;
+    }
 }
 
 /**
@@ -6451,6 +6571,21 @@ function fm_show_header_login()
             $_ace_file_writable = is_writable($_ace_path . '/' . $_ace_file);
         ?>
             <?php print_external('js-ace'); ?>
+            <?php if (!fm_cdn_available()): ?>
+            <script>
+                // Offline mode: point ACE at local assets, disable background workers
+                // (workers need separate JS files fetched by URL; disabling loses syntax
+                //  squiggles but keeps all syntax highlighting — acceptable trade-off)
+                (function() {
+                    var base = window.location.pathname + '?mfm_asset=ace/';
+                    ace.config.set('basePath',       base);
+                    ace.config.set('modePath',       base);
+                    ace.config.set('themePath',      base);
+                    ace.config.set('workerPath',     base);
+                    ace.config.set('useWorker',      false);
+                }());
+            </script>
+            <?php endif; ?>
             <script>
                 var editor = null;
                 (function() {
