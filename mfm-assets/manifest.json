@@ -1,0 +1,15 @@
+{
+  "generated": "2026-05-26T18:37:25Z",
+  "versions": {
+    "bootstrap": "5.3.3",
+    "dropzone": "5.9.3",
+    "fontawesome": "4.7.0",
+    "highlightjs": "11.9.0",
+    "ace": "1.32.2"
+  },
+  "counts": {
+    "ok": 76,
+    "skipped": 3,
+    "failed": 0
+  }
+}
