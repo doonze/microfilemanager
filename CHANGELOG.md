@@ -27,6 +27,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   if editor is still null when elevation supplies content.
 
 ### Fixed
+- **PHP 8.5 compatibility** — removed deprecated `finfo_close()` call in `fm_get_mime_type()`. PHP auto-frees `finfo` objects on scope exit; the manual close was never required and is deprecated in 8.5. Fully compatible with 8.2+.
 - **Elevation modal double-click removed** — verifying credentials now immediately
   fires edit/view action on success. The redundant "Begin Editing/Viewing" button is
   gone. Verify button shows "Loading…" as feedback while action fires. Null ref crash
