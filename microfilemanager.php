@@ -1,4 +1,41 @@
 <?php
+// ── Offline asset serve (?mfm_asset=path) ────────────────────────────────────────────
+// MUST be first — public endpoint, no session/auth needed. Runs before session_start()
+// so nothing can pollute output before the Content-Type header is sent.
+// Serves files from ./mfm-assets/ only. Strict path validation; no traversal possible.
+if (isset($_GET['mfm_asset'])) {
+    $asset_key  = ltrim(preg_replace('/[^a-zA-Z0-9\/_\-.]/', '', $_GET['mfm_asset']), '/');
+    $assets_dir = rtrim(__DIR__, '/\\') . DIRECTORY_SEPARATOR . 'mfm-assets';
+    $asset_real = realpath($assets_dir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $asset_key));
+
+    // Reject traversal or missing files
+    if (!$asset_real || strpos($asset_real, realpath($assets_dir)) !== 0 || !is_file($asset_real)) {
+        http_response_code(404);
+        exit('Asset not found.');
+    }
+
+    $ext_map = [
+        'css'   => 'text/css',
+        'js'    => 'application/javascript',
+        'woff2' => 'font/woff2',
+        'woff'  => 'font/woff',
+        'ttf'   => 'font/ttf',
+        'otf'   => 'font/otf',
+        'eot'   => 'application/vnd.ms-fontobject',
+        'svg'   => 'image/svg+xml',
+        'json'  => 'application/json',
+        'map'   => 'application/json',
+    ];
+    $asset_ext  = strtolower(pathinfo($asset_real, PATHINFO_EXTENSION));
+    $asset_mime = $ext_map[$asset_ext] ?? 'application/octet-stream';
+
+    header('Content-Type: '    . $asset_mime);
+    header('Content-Length: '  . filesize($asset_real));
+    header('Cache-Control: public, max-age=86400'); // 1-day browser cache
+    header('X-MFM-Asset: offline');
+    readfile($asset_real);
+    exit();
+}
 //Default Configuration
 $CONFIG = '{"lang":"en","error_reporting":true,"show_hidden":false,"hide_Cols":false,"theme":"dark"}';
 
@@ -1094,44 +1131,8 @@ if ((isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_
     exit();
 }
 
-// ── Offline asset serve (?mfm_asset=path) ────────────────────────────────────────────
-// Public — no auth required. CSS/JS needed on login page before session exists.
-// Serves files from ./mfm-assets/ only. Strict path validation; no traversal possible.
-if (isset($_GET['mfm_asset'])) {
-    $asset_key  = ltrim(preg_replace('/[^a-zA-Z0-9\/_\-.]/', '', $_GET['mfm_asset']), '/');
-    $assets_dir = rtrim(__DIR__, '/\\') . DIRECTORY_SEPARATOR . 'mfm-assets';
-    $asset_real = realpath($assets_dir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $asset_key));
 
-    // Reject traversal or missing files
-    if (!$asset_real || strpos($asset_real, realpath($assets_dir)) !== 0 || !is_file($asset_real)) {
-        http_response_code(404);
-        exit('Asset not found.');
-    }
 
-    $ext_map = [
-        'css'   => 'text/css',
-        'js'    => 'application/javascript',
-        'woff2' => 'font/woff2',
-        'woff'  => 'font/woff',
-        'ttf'   => 'font/ttf',
-        'otf'   => 'font/otf',
-        'eot'   => 'application/vnd.ms-fontobject',
-        'svg'   => 'image/svg+xml',
-        'json'  => 'application/json',
-        'map'   => 'application/json',
-    ];
-    $asset_ext  = strtolower(pathinfo($asset_real, PATHINFO_EXTENSION));
-    $asset_mime = $ext_map[$asset_ext] ?? 'application/octet-stream';
-
-    header('Content-Type: '    . $asset_mime);
-    header('Content-Length: '  . filesize($asset_real));
-    header('Cache-Control: public, max-age=86400'); // 1-day browser cache
-    header('X-MFM-Asset: offline');
-    readfile($asset_real);
-    exit();
-}
-
-// ── Raw image serve (for hover preview when files are outside web root) ─────────────
 // Requires valid session or no-auth mode. No token needed — read-only, images only.
 if (isset($_GET['raw']) && (isset($_SESSION[FM_SESSION_ID]['logged'], $auth_users[$_SESSION[FM_SESSION_ID]['logged']]) || !FM_USE_AUTH)) {
     $path = rtrim(FM_ROOT_PATH, '/') . (FM_PATH !== '' ? '/' . ltrim(FM_PATH, '/') : '');
