@@ -142,7 +142,7 @@
                     <hr>
 
                     <p class="mb-2">Prefer the command line? Generate a hash directly on your server:</p>
-                    <div class="code-block mb-3">php -r "echo password_hash('yourpassword', PASSWORD_DEFAULT);"</div>
+                    <div class="code-block mb-3">php -r "echo password_hash('yourpassword', PASSWORD_DEFAULT) . PHP_EOL;"</div>
 
                     <hr>
 
@@ -165,7 +165,7 @@
 </footer>
 
 <!-- bcryptjs — all hashing done client-side, nothing leaves your browser -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/bcryptjs/2.4.3/bcrypt.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js" crossorigin="anonymous"></script>
 <script>
 (function () {
     'use strict';
@@ -261,8 +261,17 @@
         hashOutput.value = '';
         copyBtn.disabled = true;
 
+        // Safety check — library failed to load
+        if (typeof dcodeIO === 'undefined' || !dcodeIO.bcrypt) {
+            generateBtn.disabled = false;
+            btnLabel.classList.remove('d-none');
+            btnSpinner.classList.add('d-none');
+            hashOutput.value = 'Error: bcrypt library failed to load. Check your internet connection.';
+            return;
+        }
+
         // Cost factor 10 — matches PHP PASSWORD_DEFAULT
-        dcodeIO.bcrypt.hash(pwd, 10, null, function (err, hash) {
+        dcodeIO.bcrypt.hash(pwd, 10, function (err, hash) {
             generateBtn.disabled = false;
             btnLabel.classList.remove('d-none');
             btnSpinner.classList.add('d-none');
