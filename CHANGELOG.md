@@ -11,6 +11,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [3.4] - Unreleased
 
 ### Added
+- **`mfm-assets/` committed to repo** — offline CDN assets (Bootstrap, Dropzone, Font Awesome, Highlight.js, ACE + all modes/themes) are now tracked in git and included in all releases. Full releases are CDN-free out of the box on networks that can't reach external CDNs. `download_assets.py` is still used to refresh assets when bumping library versions — run it and commit the result.
 - **Image/audio/video hover preview via `?raw=` endpoint** — new PHP handler serves
   media files directly from the filesystem through PHP, bypassing Apache DocumentRoot
   restrictions. Output buffers flushed before `readfile()` to prevent buffered HTML
@@ -28,6 +29,8 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 - **PHP 8.5 compatibility** — removed deprecated `finfo_close()` call in `fm_get_mime_type()`. PHP auto-frees `finfo` objects on scope exit; the manual close was never required and is deprecated in 8.5. Fully compatible with 8.2+.
+- **UTF-8 BOM removed from file start** — a BOM byte sequence (`EF BB BF`) before `<?php` caused PHP to emit 3 bytes of output before any code ran. On servers with `output_buffering=Off` (Ubuntu/PHP 8.5 default) this committed the response as `text/html`, breaking all `header()` calls including the offline asset handler and session cookies. Servers with buffering on (many shared hosts) masked the bug silently.
+- **`?mfm_asset=` handler moved to top of file** — handler now runs as the absolute first thing after `<?php`, before `session_start()`, config loading, or any other setup. Previously at line ~1097, any PHP warning or output in the preceding 1000+ lines would corrupt the `Content-Type` header, causing CSS/JS assets to be served as `text/html` and rejected by the browser. Endpoint comment updated: `MUST be first`.
 - **Elevation modal double-click removed** — verifying credentials now immediately
   fires edit/view action on success. The redundant "Begin Editing/Viewing" button is
   gone. Verify button shows "Loading…" as feedback while action fires. Null ref crash

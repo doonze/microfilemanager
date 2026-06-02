@@ -110,6 +110,16 @@ Copy `microfilemanager.php` to your webspace — that's all :)
 
 You can rename the file to anything you want (`files.php`, `index.php`, etc.).
 
+### CDN-free / Offline Operation
+
+MFM automatically detects whether external CDNs are reachable and falls back to bundled local assets if they are not. This means **MFM works out of the box on air-gapped servers, corporate networks that block CDNs, or any environment without reliable external internet access** — no configuration needed.
+
+The `mfm-assets/` directory included in every release contains local copies of Bootstrap, Dropzone, Font Awesome, Highlight.js, and the ACE editor (including all modes and themes). If the CDN check fails, all CSS and JS is served from these local files automatically.
+
+> ⚠️ **If you deploy only `microfilemanager.php` (single-file mode)** the CDN fallback is not available — the app will still work, but requires CDN access for full styling. For CDN-free operation, deploy the full release directory including `mfm-assets/`.
+
+> **Adding new CDN libraries:** If you add a new external library to `microfilemanager.php`, you must also add it to `download_assets.py`, run the script, and commit the downloaded files to `mfm-assets/`. This keeps the offline fallback in sync.
+
 ### Configuration
 
 **Option 1 — Edit the main file directly (simplest)**
