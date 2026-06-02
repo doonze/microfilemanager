@@ -148,8 +148,9 @@
 
                     <p class="small text-body-secondary mb-0">
                         <i class="fa fa-shield me-1"></i>
-                        Hashes use <strong>bcrypt</strong> with cost factor <strong>10</strong> &mdash; the same default PHP uses for
+                        Hashes use <strong>bcrypt</strong> with cost factor <strong>12</strong> &mdash; the default PHP 8.4+ uses for
                         <code>PASSWORD_DEFAULT</code>. Verified with <code>password_verify()</code>. Non-reversible.
+                        PHP accepts <code>$2a$</code>, <code>$2b$</code>, and <code>$2y$</code> prefixes interchangeably.
                     </p>
 
                 </div>
@@ -270,8 +271,8 @@
             return;
         }
 
-        // Cost factor 10 — matches PHP PASSWORD_DEFAULT
-        dcodeIO.bcrypt.hash(pwd, 10, function (err, hash) {
+        // Cost factor 12 — matches PHP PASSWORD_DEFAULT since PHP 8.4
+        dcodeIO.bcrypt.hash(pwd, 12, function (err, hash) {
             generateBtn.disabled = false;
             btnLabel.classList.remove('d-none');
             btnSpinner.classList.add('d-none');
@@ -281,8 +282,8 @@
                 return;
             }
 
-            // Replace $2b$ with $2y$ for full PHP compatibility across all versions
-            hash = hash.replace(/^\$2b\$/, '$2y$');
+            // Replace $2a$ with $2y$ for full PHP compatibility across all versions
+            hash = hash.replace(/^\$2a\$/, '$2y$');
             hashOutput.value = hash;
             copyBtn.disabled = false;
             hashOutput.select();
